@@ -4,6 +4,7 @@ install-tools:
 	bash ./scripts/install-tools.sh
 
 lint:
+	go mod verify
 	go vet ./pkg/...
 	golint ./pkg/...
 
