@@ -4,9 +4,7 @@ install-tools:
 	bash ./scripts/install-tools.sh
 
 lint:
-	go mod verify
-	go vet ./pkg/...
-	golint ./pkg/...
+	bash ./scripts/lint.sh
 
 tests:
 	gotestsum --no-color=false --format testname -- -timeout 600s -p 8 -parallel 8 -v -race -coverprofile=/tmp/profile.out ./pkg/...

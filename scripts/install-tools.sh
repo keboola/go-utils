@@ -10,5 +10,5 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "$SCRIPT_DIR"
 
 ./install-gotestsum.sh -b $(go env GOPATH)/bin
-go install golang.org/x/lint/golint
-go install golang.org/x/tools/cmd/godoc
+go install honnef.co/go/tools/cmd/staticcheck@2022.1
+go install golang.org/x/tools/cmd/godoc@latest

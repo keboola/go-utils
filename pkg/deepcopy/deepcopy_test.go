@@ -29,7 +29,7 @@ type UnExportedFields struct {
 	key2 string
 }
 
-func ExampleCopy_output() {
+func ExampleCopy() {
 	original := map[string]any{"foo": &Bar{Key1: "abc", Key2: "def", Key3: 123}}
 	clone := Copy(original).(map[string]any)
 
@@ -40,7 +40,7 @@ func ExampleCopy_output() {
 	// values are same:        *original.foo == *clone.foo -> true
 }
 
-func ExampleCopyTranslate_output() {
+func ExampleCopyTranslate() {
 	original := map[string]any{"foo": &Bar{Key1: "abc", Key2: "def", Key3: 123}}
 	clone := CopyTranslate(original, func(original, clone reflect.Value, path Path) {
 		fmt.Printf("Copying: %s\n", path)
