@@ -1,0 +1,13 @@
+version: '3'
+services:
+  dev:
+    image: keboolabot/go-utils-dev
+    build: .
+    ports:
+      - "6060:6060"
+    volumes:
+      - ./:/code:z
+      - cache:/tmp/cache
+
+volumes:
+  cache:
