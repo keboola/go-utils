@@ -5,8 +5,9 @@
   - Usage `import "github.com/keboola/go-utils/pkg/deepcopy"`.
 - **orderedmap**
   - Extended version of [iancoleman/orderedmap](https://github.com/iancoleman/orderedmap).
-  - Usage `import "github.com/keboola/go-utils/pkg/orderedmap"`. 
-
+  - Usage `import "github.com/keboola/go-utils/pkg/orderedmap"`.
+- **wildcards**
+  - Helper to compare text with wildcards in test.
 ## Development
 
 Clone the repository and run dev container:
