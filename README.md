@@ -1,4 +1,4 @@
-# Go Utils
+# Keboola Go Utils
  
 - **deepcopy**
   - Deep copy and deep translate of a value, extended version of [hvoecking gist](https://gist.github.com/hvoecking/10772475).
