@@ -25,21 +25,21 @@ func (t *mockedT) Errorf(format string, args ...interface{}) {
 func TestAssertWildcardsSame1(t *testing.T) {
 	t.Parallel()
 	test := &mockedT{buf: bytes.NewBuffer(nil)}
-	AssertWildcards(test, "foo", "foo", "Fail msg.")
+	Assert(test, "foo", "foo", "Fail msg.")
 	assert.Equal(t, "", test.buf.String())
 }
 
 func TestAssertWildcardsSame2(t *testing.T) {
 	t.Parallel()
 	test := &mockedT{buf: bytes.NewBuffer(nil)}
-	AssertWildcards(test, "%c%c%c", "foo", "Fail msg.")
+	Assert(test, "%c%c%c", "foo", "Fail msg.")
 	assert.Equal(t, "", test.buf.String())
 }
 
 func TestAssertWildcardsDifferent1(t *testing.T) {
 	t.Parallel()
 	test := &mockedT{buf: bytes.NewBuffer(nil)}
-	AssertWildcards(test, "foo", "bar")
+	Assert(test, "foo", "bar")
 	expected := `
 Diff:
 -----
@@ -67,7 +67,7 @@ foo
 func TestAssertWildcardsDifferent2(t *testing.T) {
 	t.Parallel()
 	test := &mockedT{buf: bytes.NewBuffer(nil)}
-	AssertWildcards(test, "%c%c%c%c", "bar")
+	Assert(test, "%c%c%c%c", "bar")
 	expected := `
 Diff:
 -----
@@ -147,7 +147,7 @@ Foo7: bar7
 -----
 `
 
-	AssertWildcards(test, wildcards, actual)
+	Assert(test, wildcards, actual)
 	// Get error message
 	_, testLog, _ := strings.Cut(test.buf.String(), "Error:")
 	// Trim leading whitespaces from each line
@@ -178,7 +178,7 @@ func TestWildcardToRegexp(t *testing.T) {
 	}
 
 	for _, data := range cases {
-		assert.Equal(t, data.out, WildcardToRegexp(data.in), data.in)
+		assert.Equal(t, data.out, ToRegexp(data.in), data.in)
 	}
 }
 
@@ -240,7 +240,7 @@ func TestWildcardToRegexpMatch(t *testing.T) {
 	}
 
 	for _, data := range cases {
-		match := regexp.MustCompile(`^` + WildcardToRegexp(data.pattern) + `$`).MatchString(data.input)
+		match := regexp.MustCompile(`^` + ToRegexp(data.pattern) + `$`).MatchString(data.input)
 		assert.Equal(t, data.match, match, fmt.Sprintf(`pattern: "%s", input: "%s"`, data.pattern, data.input))
 	}
 }

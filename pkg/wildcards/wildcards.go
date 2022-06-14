@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// AssertWildcards compares two texts, in expected value can be used wildcards, see WildcardToRegexp function.
-func AssertWildcards(t assert.TestingT, expected string, actual string, msgAndArgs ...interface{}) {
+// Assert compares two texts, in expected value can be used wildcards, see ToRegexp function.
+func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...interface{}) {
 	expected = strings.TrimSpace(expected)
 	actual = strings.TrimSpace(actual)
 
@@ -40,7 +40,7 @@ func AssertWildcards(t assert.TestingT, expected string, actual string, msgAndAr
 	if len(expected) == 0 {
 		assert.Equal(t, expected, actual, msgAndArgs...)
 	} else {
-		expectedRegexp := WildcardToRegexp(strings.TrimSpace(expected))
+		expectedRegexp := ToRegexp(strings.TrimSpace(expected))
 		diff := difflib.UnifiedDiff{
 			A: difflib.SplitLines(EscapeWhitespaces(expected)),
 			B: difflib.SplitLines(EscapeWhitespaces(actual)),
@@ -54,11 +54,11 @@ func AssertWildcards(t assert.TestingT, expected string, actual string, msgAndAr
 	}
 }
 
-// WildcardToRegexp converts string with wildcards to regexp, so it can be used in assert.Regexp.
-func WildcardToRegexp(pattern string) string {
-	pattern = regexp.QuoteMeta(pattern)
+// ToRegexp converts string with wildcards to regexp, so it can be used in assert.Regexp.
+func ToRegexp(input string) string {
+	input = regexp.QuoteMeta(input)
 	re := regexp.MustCompile(`%.`)
-	return re.ReplaceAllStringFunc(pattern, func(s string) string {
+	return re.ReplaceAllStringFunc(input, func(s string) string {
 		// Inspired by PhpUnit "assertStringMatchesFormat"
 		// https://phpunit.readthedocs.io/en/9.5/assertions.html#assertstringmatchesformat
 		switch s {
@@ -150,7 +150,7 @@ func cleanDiffOutput(in string) string {
 		}
 
 		// Compare expected and actual, for example "Foo:␣%s" and "Foo:␣bar4"
-		if !regexp.MustCompile("^" + WildcardToRegexp(expected) + "$").MatchString(actual) {
+		if !regexp.MustCompile("^" + ToRegexp(expected) + "$").MatchString(actual) {
 			// Keep block with difference
 			out.WriteString("@@" + block)
 		}
