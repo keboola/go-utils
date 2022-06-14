@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Assert compares two texts, in expected value can be used wildcards, see ToRegexp function.
+// Assert compares two texts and allows using wildcards in expected value, see ToRegexp function.
 func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...interface{}) {
 	expected = strings.TrimSpace(expected)
 	actual = strings.TrimSpace(actual)
@@ -122,9 +122,9 @@ func EscapeWhitespaces(input string) string {
 }
 
 // cleanDiffOutput - if text doesn't match wildcards, then diff between <wildcards/text> is printed.
-// So we have to remove diff blocks that are not wrong.
+// So we have to remove diff blocks that are false positive.
 //
-// Example of valid diff block that should be omitted:
+// Example of diff block that should be omitted:
 // 	@@ -4 +4 @@
 //	-Foo:␣%s
 //	+Foo:␣bar4
