@@ -36,6 +36,9 @@ func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...int
 	// Replace NBSP with space
 	actual = strings.ReplaceAll(actual, " ", " ")
 
+	// Remove \r chars
+	actual = strings.ReplaceAll(actual, "\r", "")
+
 	// Assert
 	if len(expected) == 0 {
 		assert.Equal(t, expected, actual, msgAndArgs...)
