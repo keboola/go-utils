@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Assert compares two texts and allows using wildcards in expected value, see ToRegexp function.
-func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...interface{}) {
+// Compare compares two texts and allows using wildcards in expected value, see ToRegexp function.
+func Compare(expected string, actual string) error {
 	expected = strings.TrimSpace(expected)
 	actual = strings.TrimSpace(actual)
 
@@ -41,7 +41,9 @@ func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...int
 
 	// Assert
 	if len(expected) == 0 {
-		assert.Equal(t, expected, actual, msgAndArgs...)
+		if len(actual) != 0 {
+			return fmt.Errorf(`not equal, expected "", actual "%s"`, actual)
+		}
 	} else {
 		expectedRegexp := ToRegexp(strings.TrimSpace(expected))
 		diff := difflib.UnifiedDiff{
@@ -52,8 +54,17 @@ func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...int
 		diffStr = cleanDiffOutput(diffStr)
 		r := regexp.MustCompile("^" + expectedRegexp + "$")
 		if !r.MatchString(actual) {
-			assert.Fail(t, fmt.Sprintf("Diff:\n-----\n%s-----\nActual:\n-----\n%s\n-----\nExpected:\n-----\n%v\n-----\n", diffStr, actual, expected), msgAndArgs...)
+			return fmt.Errorf("Diff:\n-----\n%s-----\nActual:\n-----\n%s\n-----\nExpected:\n-----\n%v\n-----\n", diffStr, actual, expected) //lint:ignore ST1005 We want to end with a newline
 		}
+	}
+	return nil
+}
+
+// Assert compares two texts and allows using wildcards in expected value, see ToRegexp function.
+func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...interface{}) {
+	err := Compare(expected, actual)
+	if err != nil {
+		assert.Fail(t, err.Error(), msgAndArgs...)
 	}
 }
 
