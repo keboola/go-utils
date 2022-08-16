@@ -47,28 +47,34 @@ type UnlockFn func()
 // GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // Project lock is automatically released at the end of the test.
 // If no project is available, the function waits until a project is released.
-func GetTestProjectForTest(t *testing.T) *Project {
+func GetTestProjectForTest(t *testing.T) (*Project, error) {
 	t.Helper()
 
 	// Get project
-	p, unlockFn := GetTestProject()
+	p, unlockFn, err := GetTestProject()
+	if err != nil {
+		return nil, err
+	}
 
 	// Unlock when test is done
 	t.Cleanup(func() {
 		unlockFn()
 	})
 
-	return p
+	return p, nil
 }
 
 // GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
 // If no project is available, the function waits until a project is released.
-func GetTestProject() (*Project, UnlockFn) {
-	initProjects()
+func GetTestProject() (*Project, UnlockFn, error) {
+	err := initProjects()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	if len(projects) == 0 {
-		panic(fmt.Errorf(`no test project`))
+		return nil, nil, fmt.Errorf(`no test project`)
 	}
 
 	for {
@@ -77,7 +83,7 @@ func GetTestProject() (*Project, UnlockFn) {
 			if p.tryLock() {
 				return p, func() {
 					p.unlock()
-				}
+				}, nil
 			}
 		}
 
@@ -160,13 +166,13 @@ func resetProjects() {
 	projects = nil
 }
 
-func initProjects() {
+func initProjects() error {
 	initLock.Lock()
 	defer initLock.Unlock()
 
 	// Init only once
 	if projects != nil {
-		return
+		return nil
 	}
 
 	// Multiple test projects
@@ -183,10 +189,10 @@ func initProjects() {
 
 			// Check number of parts
 			if len(parts) != 3 {
-				panic(fmt.Errorf(
+				return fmt.Errorf(
 					`project definition in TEST_PROJECTS env must be in "storage_api_host|project_id|project_token " format, given "%s"`,
 					p,
-				))
+				)
 			}
 
 			host := strings.TrimSpace(parts[0])
@@ -194,7 +200,7 @@ func initProjects() {
 			token := strings.TrimSpace(parts[2])
 			idInt, err := strconv.Atoi(id)
 			if err != nil {
-				panic(fmt.Errorf(`project ID = "%s" is not valid integer`, id))
+				return fmt.Errorf(`project ID = "%s" is not valid integer`, id)
 			}
 			projects = append(projects, newProject(host, idInt, token))
 		}
@@ -202,6 +208,7 @@ func initProjects() {
 
 	// No test project
 	if len(projects) == 0 {
-		panic(fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`))
+		return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`)
 	}
+	return nil
 }
