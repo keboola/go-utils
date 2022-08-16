@@ -17,6 +17,7 @@ package testproject
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,6 +31,12 @@ import (
 
 var projects []*Project      // nolint gochecknoglobals
 var initLock = &sync.Mutex{} // nolint gochecknoglobals
+
+type ProjectDef struct {
+	StorageAPIHost  string
+	StorageAPIToken string
+	ProjectID       int
+}
 
 // Project represents a testing project for E2E tests.
 type Project struct {
@@ -65,6 +72,12 @@ func GetTestProject(t *testing.T) *Project {
 		// No free project -> wait
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+// GetRandomTestProject returns a random testing project specified in TEST_KBC_PROJECTS environment variable.
+func GetRandomTestProject() *ProjectDef {
+	defs := parseProjects()
+	return defs[rand.Intn(len(defs))]
 }
 
 // ID returns id of the project.
@@ -129,7 +142,7 @@ func (p *Project) unlock() {
 }
 
 // newProject - create test project handler and lock it.
-func newProject(host string, id int, token string) *Project {
+func newProject(def *ProjectDef) *Project {
 	// Create locks dir if not exists
 	locksDir := filepath.Join(os.TempDir(), `.keboola-as-code-locks`)
 	if err := os.MkdirAll(locksDir, 0o700); err != nil {
@@ -137,20 +150,31 @@ func newProject(host string, id int, token string) *Project {
 	}
 
 	// lock file name
-	lockFile := host + `-` + strconv.Itoa(id) + `.lock`
+	lockFile := def.StorageAPIHost + `-` + strconv.Itoa(def.ProjectID) + `.lock`
 	lockPath := filepath.Join(locksDir, lockFile)
 
-	return &Project{storageAPIHost: host, projectID: id, storageAPIToken: token, lock: &sync.Mutex{}, fsLock: flock.New(lockPath)}
+	return &Project{
+		storageAPIHost:  def.StorageAPIHost,
+		projectID:       def.ProjectID,
+		storageAPIToken: def.StorageAPIToken,
+		lock:            &sync.Mutex{},
+		fsLock:          flock.New(lockPath),
+	}
 }
 
 func initProjects() {
 	initLock.Lock()
 	defer initLock.Unlock()
 
-	// Init only once
-	if projects != nil {
-		return
+	projectDefinitions := parseProjects()
+
+	for _, def := range projectDefinitions {
+		projects = append(projects, newProject(def))
 	}
+}
+
+func parseProjects() []*ProjectDef {
+	res := make([]*ProjectDef, 0)
 
 	// Multiple test projects
 	if def, found := os.LookupEnv(`TEST_KBC_PROJECTS`); found {
@@ -179,12 +203,14 @@ func initProjects() {
 			if err != nil {
 				panic(fmt.Errorf(`project ID = "%s" is not valid integer`, id))
 			}
-			projects = append(projects, newProject(host, idInt, token))
+			res = append(res, &ProjectDef{StorageAPIHost: host, ProjectID: idInt, StorageAPIToken: token})
 		}
 	}
 
 	// No test project
-	if len(projects) == 0 {
+	if len(res) == 0 {
 		panic(fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`))
 	}
+
+	return res
 }

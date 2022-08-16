@@ -43,3 +43,14 @@ func TestGetTestProject_Empty(t *testing.T) {
 		_ = testproject.GetTestProject(t)
 	})
 }
+
+func TestGetRandomTestProject(t *testing.T) {
+	def1 := "connection.keboola.com|1234|1234-abcdef;"
+	def2 := "connection.keboola.com|3456|3456-abcdef;"
+	def3 := "connection.keboola.com|5678|5678-abcdef;"
+	_ = os.Setenv("TEST_KBC_PROJECTS", def1+def2+def3)
+
+	def := testproject.GetRandomTestProject()
+	assert.IsType(t, &testproject.ProjectDef{}, def)
+	assert.Equal(t, "connection.keboola.com", def.StorageAPIHost)
+}
