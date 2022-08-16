@@ -33,7 +33,6 @@ var initLock = &sync.Mutex{} // nolint gochecknoglobals
 
 // Project represents a testing project for E2E tests.
 type Project struct {
-	t               *testing.T
 	storageAPIHost  string
 	storageAPIToken string
 	projectID       int
@@ -43,11 +42,29 @@ type Project struct {
 	locked bool
 }
 
-// GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
+type UnlockFn func()
+
+// GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // Project lock is automatically released at the end of the test.
 // If no project is available, the function waits until a project is released.
-func GetTestProject(t *testing.T) *Project {
+func GetTestProjectForTest(t *testing.T) *Project {
 	t.Helper()
+
+	// Get project
+	p, unlockFn := GetTestProject()
+
+	// Unlock when test is done
+	t.Cleanup(func() {
+		unlockFn()
+	})
+
+	return p
+}
+
+// GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
+// The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
+// If no project is available, the function waits until a project is released.
+func GetTestProject() (*Project, UnlockFn) {
 	initProjects()
 
 	if len(projects) == 0 {
@@ -57,8 +74,10 @@ func GetTestProject(t *testing.T) *Project {
 	for {
 		// Try to find a free project
 		for _, p := range projects {
-			if p.tryLock(t) {
-				return p
+			if p.tryLock() {
+				return p, func() {
+					p.unlock()
+				}
 			}
 		}
 
@@ -91,7 +110,7 @@ func (p *Project) assertLocked() {
 	}
 }
 
-func (p *Project) tryLock(t *testing.T) bool {
+func (p *Project) tryLock() bool {
 	// This FS lock works between processes
 	if locked, err := p.fsLock.TryLock(); err != nil {
 		panic(fmt.Errorf(`cannot lock test project: %w`, err))
@@ -107,14 +126,7 @@ func (p *Project) tryLock(t *testing.T) bool {
 	}
 
 	// Locked
-	p.t = t
 	p.locked = true
-
-	// Unlock, when test is done
-	p.t.Cleanup(func() {
-		p.unlock()
-	})
-
 	return true
 }
 
@@ -122,7 +134,6 @@ func (p *Project) tryLock(t *testing.T) bool {
 func (p *Project) unlock() {
 	defer p.lock.Unlock()
 	p.locked = false
-	p.t = nil
 	if err := p.fsLock.Unlock(); err != nil {
 		panic(fmt.Errorf(`cannot unlock test project: %w`, err))
 	}
@@ -141,6 +152,12 @@ func newProject(host string, id int, token string) *Project {
 	lockPath := filepath.Join(locksDir, lockFile)
 
 	return &Project{storageAPIHost: host, projectID: id, storageAPIToken: token, lock: &sync.Mutex{}, fsLock: flock.New(lockPath)}
+}
+
+func resetProjects() {
+	initLock.Lock()
+	defer initLock.Unlock()
+	projects = nil
 }
 
 func initProjects() {
