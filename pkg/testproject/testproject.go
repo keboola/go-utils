@@ -74,8 +74,8 @@ func GetTestProject(t *testing.T) *Project {
 	}
 }
 
-// GetRandomTestProject returns a random testing project specified in TEST_KBC_PROJECTS environment variable.
-func GetRandomTestProject() *ProjectDef {
+// GetRandomTestProjectDef returns a random testing project definition specified in TEST_KBC_PROJECTS environment variable.
+func GetRandomTestProjectDef() *ProjectDef {
 	defs := parseProjects()
 	return defs[rand.Intn(len(defs))]
 }
