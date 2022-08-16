@@ -18,11 +18,14 @@ func TestGetTestProjectForTest(t *testing.T) {
 	_ = os.Setenv("TEST_KBC_PROJECTS", def1+def2+def3)
 
 	// Acquire exclusive access to the project.
-	project1 := GetTestProjectForTest(t)
+	project1, unlockFn1, _ := GetTestProject()
+	defer unlockFn1()
 	fmt.Printf("Project %d locked.\n", project1.ID())
-	project2 := GetTestProjectForTest(t)
+	project2, unlockFn2, _ := GetTestProject()
+	defer unlockFn2()
 	fmt.Printf("Project %d locked.\n", project2.ID())
-	project3 := GetTestProjectForTest(t)
+	project3, unlockFn3, _ := GetTestProject()
+	defer unlockFn3()
 	fmt.Printf("Project %d locked.\n", project3.ID())
 
 	// Project lock will be automatically released at the end of the test.
@@ -42,13 +45,13 @@ func ExampleGetTestProject() {
 	_ = os.Setenv("TEST_KBC_PROJECTS", def1+def2+def3)
 
 	// Acquire exclusive access to the project.
-	project1, unlockFn1 := GetTestProject()
+	project1, unlockFn1, _ := GetTestProject()
 	defer unlockFn1()
 	fmt.Printf("Project %d locked.\n", project1.ID())
-	project2, unlockFn2 := GetTestProject()
+	project2, unlockFn2, _ := GetTestProject()
 	defer unlockFn2()
 	fmt.Printf("Project %d locked.\n", project2.ID())
-	project3, unlockFn3 := GetTestProject()
+	project3, unlockFn3, _ := GetTestProject()
 	defer unlockFn3()
 	fmt.Printf("Project %d locked.\n", project3.ID())
 
@@ -65,16 +68,13 @@ func ExampleGetTestProject() {
 func TestGetTestProjectForTest_Empty(t *testing.T) {
 	resetProjects()
 	_ = os.Setenv("TEST_KBC_PROJECTS", "")
-	assert.PanicsWithError(t, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`, func() {
-		t := &testing.T{}
-		_ = GetTestProjectForTest(t)
-	})
+	_, err := GetTestProjectForTest(t)
+	assert.ErrorContains(t, err, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`)
 }
 
 func TestGetTestProject_Empty(t *testing.T) {
 	resetProjects()
 	_ = os.Setenv("TEST_KBC_PROJECTS", "")
-	assert.PanicsWithError(t, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`, func() {
-		_, _ = GetTestProject()
-	})
+	_, _, err := GetTestProject()
+	assert.ErrorContains(t, err, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`)
 }
