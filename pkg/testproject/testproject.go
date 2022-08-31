@@ -147,8 +147,15 @@ func (p *Project) unlock() {
 
 // newProject - create test project handler and lock it.
 func newProject(host string, id int, token string) *Project {
+	// Get locks dir name
+	lockDirName, found := os.LookupEnv("TEST_KBC_PROJECTS_LOCK_DIR_NAME")
+	if !found {
+		// Default value
+		lockDirName = ".keboola-as-code-locks"
+	}
+
 	// Create locks dir if not exists
-	locksDir := filepath.Join(os.TempDir(), `.keboola-as-code-locks`)
+	locksDir := filepath.Join(os.TempDir(), lockDirName)
 	if err := os.MkdirAll(locksDir, 0o700); err != nil {
 		panic(fmt.Errorf(`cannot lock test project: %s`, err))
 	}
