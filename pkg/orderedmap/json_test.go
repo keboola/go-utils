@@ -24,7 +24,7 @@ func TestOrderedMap_MarshalJSON(t *testing.T) {
 	o.Set("a", 2)
 	o.Set("b", 3)
 	// slice
-	o.Set("slice", []interface{}{
+	o.Set("slice", []any{
 		"1",
 		1,
 	})
@@ -134,7 +134,7 @@ func TestOrderedMap_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			Key: "slice",
-			Value: []interface{}{
+			Value: []any{
 				"1",
 				float64(1),
 			},
@@ -171,7 +171,7 @@ func TestOrderedMap_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			Key: "multitype_array",
-			Value: []interface{}{
+			Value: []any{
 				"test",
 				float64(1),
 				FromPairs([]Pair{
@@ -188,7 +188,7 @@ func TestOrderedMap_UnmarshalJSON(t *testing.T) {
 						Value: "colon: in value",
 					},
 				}),
-				[]interface{}{
+				[]any{
 					FromPairs([]Pair{
 						{
 							Key:   "inner",
@@ -241,7 +241,7 @@ func TestOrderedMap_UnmarshalJSON_DuplicateKeys(t *testing.T) {
 		},
 		{
 			Key: "e",
-			Value: []interface{}{FromPairs([]Pair{
+			Value: []any{FromPairs([]Pair{
 				{
 					Key:   "z",
 					Value: float64(2),
@@ -254,7 +254,7 @@ func TestOrderedMap_UnmarshalJSON_DuplicateKeys(t *testing.T) {
 		},
 		{
 			Key:   "b",
-			Value: []interface{}{[]interface{}{float64(1)}},
+			Value: []any{[]any{float64(1)}},
 		},
 	}), o)
 }
@@ -327,7 +327,7 @@ func TestOrderedMap_UnmarshalJSON_ArrayOfMaps(t *testing.T) {
 		},
 		{
 			Key: "breakdown",
-			Value: []interface{}{
+			Value: []any{
 				FromPairs([]Pair{
 					{Key: "name", Value: "a"},
 					{Key: "percent", Value: float64(0.9)},

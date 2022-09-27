@@ -39,15 +39,15 @@ func TestOrderedMap(t *testing.T) {
 		t.Error("Set strings second index")
 	}
 	// mixed slice
-	o.Set("mixed", []interface{}{
+	o.Set("mixed", []any{
 		1,
 		"1",
 	})
 	v, _ = o.Get("mixed")
-	if v.([]interface{})[0].(int) != 1 {
+	if v.([]any)[0].(int) != 1 {
 		t.Error("Set mixed int")
 	}
-	if v.([]interface{})[1].(string) != "1" {
+	if v.([]any)[1].(string) != "1" {
 		t.Error("Set mixed string")
 	}
 	// overriding existing key
@@ -212,9 +212,9 @@ func TestOrderedMapGetNested(t *testing.T) {
 	root := New()
 	nested := New()
 	nested.Set(`key`, `value`)
-	nested.Set(`slice`, []interface{}{1, 2, 3})
+	nested.Set(`slice`, []any{1, 2, 3})
 	root.Set(`nested`, nested)
-	root.Set(`slice`, []interface{}{1, 2, 3})
+	root.Set(`slice`, []any{1, 2, 3})
 
 	// Missing root map key
 	value, found, err := root.GetNested(`foo`)

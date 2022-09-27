@@ -61,7 +61,7 @@ func Compare(expected string, actual string) error {
 }
 
 // Assert compares two texts and allows using wildcards in expected value, see ToRegexp function.
-func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...interface{}) {
+func Assert(t assert.TestingT, expected string, actual string, msgAndArgs ...any) {
 	err := Compare(expected, actual)
 	if err != nil {
 		assert.Fail(t, err.Error(), msgAndArgs...)
