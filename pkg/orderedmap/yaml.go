@@ -6,6 +6,30 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func (o *OrderedMap) MarshalYAML() (any, error) {
+	node := &yaml.Node{Kind: yaml.MappingNode}
+	for _, key := range o.Keys() {
+		value, _ := o.Get(key)
+
+		// Encode key
+		keyNode := &yaml.Node{Kind: yaml.MappingNode}
+		node.Content = append(node.Content, keyNode)
+		if err := keyNode.Encode(key); err != nil {
+			return nil, err
+		}
+
+		// Encode value
+		valueNode := &yaml.Node{Kind: yaml.ScalarNode}
+		node.Content = append(node.Content, valueNode)
+		err := valueNode.Encode(value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return node, nil
+}
+
 func (o *OrderedMap) UnmarshalYAML(node *yaml.Node) error {
 	if o.values == nil {
 		o.values = map[string]any{}

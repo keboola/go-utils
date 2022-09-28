@@ -1,11 +1,78 @@
 package orderedmap
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
+
+func TestOrderedMap_MarshalYAML(t *testing.T) {
+	t.Parallel()
+	o := New()
+
+	// number
+	o.Set("number", 3)
+	// string
+	o.Set("string", "x")
+	// string
+	o.Set("specialstring", "\\.<>[]{}_-")
+	// new value keeps key in old position
+	o.Set("number", 4)
+	// keys not sorted alphabetically
+	o.Set("z", 1)
+	o.Set("a", 2)
+	o.Set("b", 3)
+	// slice
+	o.Set("slice", []any{
+		"1",
+		1,
+	})
+	// orderedmap
+	v := New()
+	v.Set("e", 1)
+	v.Set("a", 2)
+	o.Set("orderedmap", v)
+	// escape key
+	o.Set("test\n\r\t\\\"ing", 9)
+
+	// result
+	expected := `
+number: 4
+string: x
+specialstring: \.<>[]{}_-
+z: 1
+a: 2
+b: 3
+slice:
+  - "1"
+  - 1
+orderedmap:
+  e: 1
+  a: 2
+? "test\n\r\t\\\"ing"
+: 9
+`
+	var out bytes.Buffer
+	encoder := yaml.NewEncoder(&out)
+	encoder.SetIndent(2)
+	assert.NoError(t, encoder.Encode(o))
+	assert.Equal(t, strings.TrimLeft(expected, "\n"), out.String())
+}
+
+func TestOrderedMap_MarshalYAML_Blank(t *testing.T) {
+	t.Parallel()
+	o := New()
+
+	// blank map
+	var out bytes.Buffer
+	encoder := yaml.NewEncoder(&out)
+	encoder.SetIndent(2)
+	assert.NoError(t, encoder.Encode(o))
+	assert.Equal(t, "{}\n", out.String())
+}
 
 func TestOrderedMap_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
