@@ -42,10 +42,10 @@ func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	o.keys = make([]string, 0, len(o.values))
-	return decodeOrderedMap(dec, o)
+	return decodeJsonOrderedMap(dec, o)
 }
 
-func decodeOrderedMap(dec *json.Decoder, o *OrderedMap) error {
+func decodeJsonOrderedMap(dec *json.Decoder, o *OrderedMap) error {
 	hasKey := make(map[string]bool, len(o.values))
 	for {
 		token, err := dec.Token()
@@ -82,7 +82,7 @@ func decodeOrderedMap(dec *json.Decoder, o *OrderedMap) error {
 						keys:   make([]string, 0, len(values)),
 						values: values,
 					}
-					if err = decodeOrderedMap(dec, newMap); err != nil {
+					if err = decodeJsonOrderedMap(dec, newMap); err != nil {
 						return err
 					}
 					o.values[key] = newMap
@@ -91,19 +91,19 @@ func decodeOrderedMap(dec *json.Decoder, o *OrderedMap) error {
 						keys:   make([]string, 0, len(oldMap.values)),
 						values: oldMap.values,
 					}
-					if err = decodeOrderedMap(dec, newMap); err != nil {
+					if err = decodeJsonOrderedMap(dec, newMap); err != nil {
 						return err
 					}
 					o.values[key] = newMap
-				} else if err = decodeOrderedMap(dec, &OrderedMap{}); err != nil {
+				} else if err = decodeJsonOrderedMap(dec, &OrderedMap{}); err != nil {
 					return err
 				}
 			case '[':
 				if values, ok := o.values[key].([]any); ok {
-					if err = decodeSlice(dec, values); err != nil {
+					if err = decodeJsonSlice(dec, values); err != nil {
 						return err
 					}
-				} else if err = decodeSlice(dec, []any{}); err != nil {
+				} else if err = decodeJsonSlice(dec, []any{}); err != nil {
 					return err
 				}
 			}
@@ -111,7 +111,7 @@ func decodeOrderedMap(dec *json.Decoder, o *OrderedMap) error {
 	}
 }
 
-func decodeSlice(dec *json.Decoder, s []any) error {
+func decodeJsonSlice(dec *json.Decoder, s []any) error {
 	for index := 0; ; index++ {
 		token, err := dec.Token()
 		if err != nil {
@@ -126,7 +126,7 @@ func decodeSlice(dec *json.Decoder, s []any) error {
 							keys:   make([]string, 0, len(values)),
 							values: values,
 						}
-						if err = decodeOrderedMap(dec, newMap); err != nil {
+						if err = decodeJsonOrderedMap(dec, newMap); err != nil {
 							return err
 						}
 						s[index] = newMap
@@ -135,26 +135,26 @@ func decodeSlice(dec *json.Decoder, s []any) error {
 							keys:   make([]string, 0, len(oldMap.values)),
 							values: oldMap.values,
 						}
-						if err = decodeOrderedMap(dec, newMap); err != nil {
+						if err = decodeJsonOrderedMap(dec, newMap); err != nil {
 							return err
 						}
 						s[index] = newMap
-					} else if err = decodeOrderedMap(dec, &OrderedMap{}); err != nil {
+					} else if err = decodeJsonOrderedMap(dec, &OrderedMap{}); err != nil {
 						return err
 					}
-				} else if err = decodeOrderedMap(dec, &OrderedMap{}); err != nil {
+				} else if err = decodeJsonOrderedMap(dec, &OrderedMap{}); err != nil {
 					return err
 				}
 			case '[':
 				if index < len(s) {
 					if values, ok := s[index].([]any); ok {
-						if err = decodeSlice(dec, values); err != nil {
+						if err = decodeJsonSlice(dec, values); err != nil {
 							return err
 						}
-					} else if err = decodeSlice(dec, []any{}); err != nil {
+					} else if err = decodeJsonSlice(dec, []any{}); err != nil {
 						return err
 					}
-				} else if err = decodeSlice(dec, []any{}); err != nil {
+				} else if err = decodeJsonSlice(dec, []any{}); err != nil {
 					return err
 				}
 			case ']':

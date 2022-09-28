@@ -1,9 +1,9 @@
 // Package orderedmap is extended version of: https://github.com/iancoleman/orderedmap
 //
-//   Differences:
-//   - Additional methods (GetNested, SetNested, ToMap, ...).
-//   - Enhanced JSON decoding: nested map is always pointer (*OrderedMap), this avoids problems with nested values modification.
-//   - Added support for deepcopy, see HandleDeepCopy method.
+//	Differences:
+//	- Additional methods (GetNested, SetNested, ToMap, ...).
+//	- Enhanced JSON decoding: nested map is always pointer (*OrderedMap), this avoids problems with nested values modification.
+//	- Added support for deepcopy, see HandleDeepCopy method.
 package orderedmap
 
 import (

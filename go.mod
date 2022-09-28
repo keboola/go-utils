@@ -7,9 +7,7 @@ require (
 	github.com/gofrs/flock v0.8.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/stretchr/testify v1.7.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
-require (
-	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
+require golang.org/x/sys v0.0.0-20211019181941-9d821ace8654 // indirect
