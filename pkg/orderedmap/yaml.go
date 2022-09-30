@@ -35,6 +35,11 @@ func (o *OrderedMap) UnmarshalYAML(node *yaml.Node) error {
 		o.values = map[string]any{}
 	}
 
+	// Check node type
+	if node.Tag != "!!map" {
+		return fmt.Errorf("cannot unmarshal %s `%s` into orderedmap", node.Tag, node.Value)
+	}
+
 	// Iterate nodes: key1, value1, key2, value2, ...
 	for i := 0; i < len(node.Content); i += 2 {
 		keyNode := node.Content[i]

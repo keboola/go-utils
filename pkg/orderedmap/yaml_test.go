@@ -361,3 +361,10 @@ func TestOrderedMap_UnmarshalYAML_Struct(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 1, value)
 }
+
+func TestOrderedMap_UnmarshalYAML_Text(t *testing.T) {
+	o := New()
+	err := yaml.Unmarshal([]byte("some text"), o)
+	assert.Error(t, err)
+	assert.Equal(t, "cannot unmarshal !!str `some text` into orderedmap", err.Error())
+}
