@@ -363,6 +363,7 @@ func TestOrderedMap_UnmarshalYAML_Struct(t *testing.T) {
 }
 
 func TestOrderedMap_UnmarshalYAML_Text(t *testing.T) {
+	t.Parallel()
 	o := New()
 	err := yaml.Unmarshal([]byte("some text"), o)
 	assert.Error(t, err)
