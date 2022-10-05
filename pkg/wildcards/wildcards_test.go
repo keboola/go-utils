@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/keboola/go-utils/pkg/wildcards"
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/keboola/go-utils/pkg/wildcards"
 )
 
 type mockedT struct {
