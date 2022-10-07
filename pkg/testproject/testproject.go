@@ -157,7 +157,7 @@ func newProject(host string, id int, token string) *Project {
 	// Create locks dir if not exists
 	locksDir := filepath.Join(os.TempDir(), lockDirName)
 	if err := os.MkdirAll(locksDir, 0o700); err != nil {
-		panic(fmt.Errorf(`cannot lock test project: %s`, err))
+		panic(fmt.Errorf(`cannot lock test project: %w`, err))
 	}
 
 	// lock file name

@@ -19,7 +19,7 @@ const CustomDeepCopyMethod = "HandleDeepCopy"
 // TranslateFn is custom translate function to modify values on copying.
 type TranslateFn func(original, clone reflect.Value, path Path)
 
-// CloneFn is custom implementation of deepcopy for a type, it is returned from CustomDeepCopyMethod,
+// CloneFn is custom implementation of deepcopy for a type, it is returned from CustomDeepCopyMethod.
 type CloneFn func(clone reflect.Value)
 
 // VisitedPtrMap maps pointer from original value to cloned value.
