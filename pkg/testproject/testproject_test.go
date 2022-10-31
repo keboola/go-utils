@@ -11,22 +11,22 @@ import (
 
 func initProjectsDefinition() string {
 	def1 := &Project{
-		Host:      "connection.keboola.com",
-		Token:     "1234-abcdef",
-		Provider:  "aws",
-		ProjectID: 1234,
+		Host:           "connection.keboola.com",
+		Token:          "1234-abcdef",
+		StagingStorage: "s3",
+		ProjectID:      1234,
 	}
 	def2 := &Project{
-		Host:      "connection.north-europe.azure.keboola.com",
-		Token:     "3456-abcdef",
-		Provider:  "azure",
-		ProjectID: 3456,
+		Host:           "connection.north-europe.azure.keboola.com",
+		Token:          "3456-abcdef",
+		StagingStorage: "abs",
+		ProjectID:      3456,
 	}
 	def3 := &Project{
-		Host:      "connection.keboola.com",
-		Token:     "5678-abcdef",
-		Provider:  "aws",
-		ProjectID: 5678,
+		Host:           "connection.keboola.com",
+		Token:          "5678-abcdef",
+		StagingStorage: "s3",
+		ProjectID:      5678,
 	}
 	j, _ := json.Marshal([]*Project{def1, def2, def3})
 	return string(j)
@@ -64,7 +64,7 @@ func TestGetTestProjectForTestProvider(t *testing.T) {
 	_ = os.Setenv("TEST_KBC_PROJECTS", initProjectsDefinition()) //nolint:forbidigo
 
 	// Acquire exclusive access to the project.
-	project1, unlockFn1, _ := GetTestProject(WithProvider("azure"))
+	project1, unlockFn1, _ := GetTestProject(WithStagingStorage("abs"))
 	defer unlockFn1()
 	assert.Equal(t, 3456, project1.ProjectID)
 }
@@ -98,7 +98,7 @@ func TestGetTestProjectForTest_Empty(t *testing.T) {
 	resetProjects()
 	_ = os.Setenv("TEST_KBC_PROJECTS", "") //nolint:forbidigo
 	_, err := GetTestProjectForTest(t)
-	assert.ErrorContains(t, err, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","provider":""}]'`)
+	assert.ErrorContains(t, err, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
 }
 
 //nolint:paralleltest
@@ -106,7 +106,7 @@ func TestGetTestProject_Empty(t *testing.T) {
 	resetProjects()
 	_ = os.Setenv("TEST_KBC_PROJECTS", "[]") //nolint:forbidigo
 	_, _, err := GetTestProject()
-	assert.ErrorContains(t, err, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","provider":""}]'`)
+	assert.ErrorContains(t, err, `please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
 }
 
 //nolint:paralleltest
@@ -114,6 +114,6 @@ func TestGetTestProjectProvider_Missing(t *testing.T) {
 	resetProjects()
 	_ = os.Setenv("TEST_KBC_PROJECTS", initProjectsDefinition()) //nolint:forbidigo
 
-	_, _, err := GetTestProject(WithProvider("gcp"))
-	assert.ErrorContains(t, err, `no test project for provider gcp`)
+	_, _, err := GetTestProject(WithStagingStorage("gcs"))
+	assert.ErrorContains(t, err, `no test project for staging storage gcs`)
 }

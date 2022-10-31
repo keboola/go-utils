@@ -33,10 +33,10 @@ var initLock = &sync.Mutex{} // nolint gochecknoglobals
 
 // Project represents a testing project for E2E tests.
 type Project struct {
-	Host      string `json:"host"`
-	Token     string `json:"token"`
-	Provider  string `json:"provider"`
-	ProjectID int    `json:"project"`
+	Host           string `json:"host" validate:"required"`
+	Token          string `json:"token" validate:"required"`
+	StagingStorage string `json:"stagingStorage" validate:"required"`
+	ProjectID      int    `json:"project" validate:"required"`
 
 	fsLock *flock.Flock `json:"-"` // fsLock between processes
 	lock   *sync.Mutex  `json:"-"` // lock between goroutines
@@ -48,7 +48,7 @@ type UnlockFn func()
 // GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // Project lock is automatically released at the end of the test.
 // If no project is available, the function waits until a project is released.
-func GetTestProjectForTest(t *testing.T, opts ...GetTestProjectOption) (*Project, error) {
+func GetTestProjectForTest(t *testing.T, opts ...Option) (*Project, error) {
 	t.Helper()
 
 	// Get project
@@ -65,25 +65,23 @@ func GetTestProjectForTest(t *testing.T, opts ...GetTestProjectOption) (*Project
 	return p, nil
 }
 
-type GetTestProjectOption func(c *getTestProjectConfig)
+type Option func(c *config)
 
-type getTestProjectConfig struct {
-	provider string
+type config struct {
+	stagingStorage string
 }
 
-func WithProvider(provider string) GetTestProjectOption {
-	return func(c *getTestProjectConfig) {
-		c.provider = provider
+func WithStagingStorage(stagingStorage string) Option {
+	return func(c *config) {
+		c.stagingStorage = stagingStorage
 	}
 }
 
 // GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
 // If no project is available, the function waits until a project is released.
-func GetTestProject(opts ...GetTestProjectOption) (*Project, UnlockFn, error) {
-	c := &getTestProjectConfig{
-		provider: "",
-	}
+func GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
+	c := &config{}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -97,29 +95,22 @@ func GetTestProject(opts ...GetTestProjectOption) (*Project, UnlockFn, error) {
 		return nil, nil, fmt.Errorf(`no test project`)
 	}
 
-	var projectsForSelection []*Project
-	if c.provider == "" {
-		projectsForSelection = projects
-	} else {
-		projectsForSelection = make([]*Project, 0)
-		for _, p := range projects {
-			if p.Provider == c.provider {
-				projectsForSelection = append(projectsForSelection, p)
-			}
-		}
-		if len(projectsForSelection) == 0 {
-			return nil, nil, fmt.Errorf(fmt.Sprintf(`no test project for provider %s`, c.provider))
-		}
-	}
-
 	for {
 		// Try to find a free project
-		for _, p := range projectsForSelection {
-			if p.tryLock() {
-				return p, func() {
-					p.unlock()
-				}, nil
+		anyProjectFound := false
+		for _, p := range projects {
+			if c.stagingStorage == "" || p.StagingStorage == c.stagingStorage {
+				if p.tryLock() {
+					return p, func() {
+						p.unlock()
+					}, nil
+				}
+				anyProjectFound = true
 			}
+		}
+
+		if !anyProjectFound {
+			return nil, nil, fmt.Errorf(fmt.Sprintf(`no test project for staging storage %s`, c.stagingStorage))
 		}
 
 		// No free project -> wait
@@ -221,7 +212,7 @@ func initProjects() error {
 	projects = make([]*Project, 0)
 	if def, found := os.LookupEnv(`TEST_KBC_PROJECTS`); found {
 		if def == "" {
-			return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","provider":""}]'`)
+			return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
 		}
 		err := json.Unmarshal([]byte(def), &projects)
 		if err != nil {
@@ -231,7 +222,7 @@ func initProjects() error {
 
 	// No test project
 	if len(projects) == 0 {
-		return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","provider":""}]'`)
+		return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
 	}
 
 	for _, p := range projects {
