@@ -16,11 +16,11 @@
 package testproject
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,13 +33,14 @@ var initLock = &sync.Mutex{} // nolint gochecknoglobals
 
 // Project represents a testing project for E2E tests.
 type Project struct {
-	storageAPIHost  string
-	storageAPIToken string
-	projectID       int
+	Host      string `json:"host"`
+	Token     string `json:"token"`
+	Provider  string `json:"provider"`
+	ProjectID int    `json:"project"`
 
-	fsLock *flock.Flock // fsLock between processes
-	lock   *sync.Mutex  // lock between goroutines
-	locked bool
+	fsLock *flock.Flock `json:"-"` // fsLock between processes
+	lock   *sync.Mutex  `json:"-"` // lock between goroutines
+	locked bool         `json:"-"`
 }
 
 type UnlockFn func()
@@ -47,11 +48,11 @@ type UnlockFn func()
 // GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // Project lock is automatically released at the end of the test.
 // If no project is available, the function waits until a project is released.
-func GetTestProjectForTest(t *testing.T) (*Project, error) {
+func GetTestProjectForTest(t *testing.T, opts ...GetTestProjectOption) (*Project, error) {
 	t.Helper()
 
 	// Get project
-	p, unlockFn, err := GetTestProject()
+	p, unlockFn, err := GetTestProject(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +65,29 @@ func GetTestProjectForTest(t *testing.T) (*Project, error) {
 	return p, nil
 }
 
+type GetTestProjectOption func(c *getTestProjectConfig)
+
+type getTestProjectConfig struct {
+	provider string
+}
+
+func WithProvider(provider string) GetTestProjectOption {
+	return func(c *getTestProjectConfig) {
+		c.provider = provider
+	}
+}
+
 // GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
 // If no project is available, the function waits until a project is released.
-func GetTestProject() (*Project, UnlockFn, error) {
+func GetTestProject(opts ...GetTestProjectOption) (*Project, UnlockFn, error) {
+	c := &getTestProjectConfig{
+		provider: "",
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+
 	err := initProjects()
 	if err != nil {
 		return nil, nil, err
@@ -77,9 +97,24 @@ func GetTestProject() (*Project, UnlockFn, error) {
 		return nil, nil, fmt.Errorf(`no test project`)
 	}
 
+	var projectsForSelection []*Project
+	if c.provider == "" {
+		projectsForSelection = projects
+	} else {
+		projectsForSelection = make([]*Project, 0)
+		for _, p := range projects {
+			if p.Provider == c.provider {
+				projectsForSelection = append(projectsForSelection, p)
+			}
+		}
+		if len(projectsForSelection) == 0 {
+			return nil, nil, fmt.Errorf(fmt.Sprintf(`no test project for provider %s`, c.provider))
+		}
+	}
+
 	for {
 		// Try to find a free project
-		for _, p := range projects {
+		for _, p := range projectsForSelection {
 			if p.tryLock() {
 				return p, func() {
 					p.unlock()
@@ -95,24 +130,24 @@ func GetTestProject() (*Project, UnlockFn, error) {
 // ID returns id of the project.
 func (p *Project) ID() int {
 	p.assertLocked()
-	return p.projectID
+	return p.ProjectID
 }
 
 // StorageAPIHost returns Storage API host of the project stack.
 func (p *Project) StorageAPIHost() string {
 	p.assertLocked()
-	return p.storageAPIHost
+	return p.Host
 }
 
 // StorageAPIToken returns Storage API token of the project.
 func (p *Project) StorageAPIToken() string {
 	p.assertLocked()
-	return p.storageAPIToken
+	return p.Token
 }
 
 func (p *Project) assertLocked() {
 	if !p.locked {
-		panic(fmt.Errorf(`test project "%d" is not locked`, p.projectID))
+		panic(fmt.Errorf(`test project "%d" is not locked`, p.ProjectID))
 	}
 }
 
@@ -145,8 +180,8 @@ func (p *Project) unlock() {
 	}
 }
 
-// newProject - create test project handler and lock it.
-func newProject(host string, id int, token string) *Project {
+// initProject - init test project handler and lock it.
+func initProject(project *Project) {
 	// Get locks dir name
 	lockDirName, found := os.LookupEnv("TEST_KBC_PROJECTS_LOCK_DIR_NAME")
 	if !found {
@@ -161,10 +196,11 @@ func newProject(host string, id int, token string) *Project {
 	}
 
 	// lock file name
-	lockFile := host + `-` + strconv.Itoa(id) + `.lock`
+	lockFile := project.Host + `-` + strconv.Itoa(project.ProjectID) + `.lock`
 	lockPath := filepath.Join(locksDir, lockFile)
 
-	return &Project{storageAPIHost: host, projectID: id, storageAPIToken: token, lock: &sync.Mutex{}, fsLock: flock.New(lockPath)}
+	project.lock = &sync.Mutex{}
+	project.fsLock = flock.New(lockPath)
 }
 
 func resetProjects() {
@@ -182,40 +218,25 @@ func initProjects() error {
 		return nil
 	}
 
-	// Multiple test projects
+	projects = make([]*Project, 0)
 	if def, found := os.LookupEnv(`TEST_KBC_PROJECTS`); found {
-		// Each project definition is separated by ";"
-		for _, p := range strings.Split(def, ";") {
-			p := strings.TrimSpace(p)
-			if len(p) == 0 {
-				break
-			}
-
-			// Definition format: storage_api_host|project_id|project_token
-			parts := strings.Split(p, `|`)
-
-			// Check number of parts
-			if len(parts) != 3 {
-				return fmt.Errorf(
-					`project definition in TEST_PROJECTS env must be in "storage_api_host|project_id|project_token " format, given "%s"`,
-					p,
-				)
-			}
-
-			host := strings.TrimSpace(parts[0])
-			id := strings.TrimSpace(parts[1])
-			token := strings.TrimSpace(parts[2])
-			idInt, err := strconv.Atoi(id)
-			if err != nil {
-				return fmt.Errorf(`project ID = "%s" is not valid integer`, id)
-			}
-			projects = append(projects, newProject(host, idInt, token))
+		if def == "" {
+			return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","provider":""}]'`)
+		}
+		err := json.Unmarshal([]byte(def), &projects)
+		if err != nil {
+			return fmt.Errorf(`decoding of env var TEST_KBC_PROJECTS failed: %w`, err)
 		}
 	}
 
 	// No test project
 	if len(projects) == 0 {
-		return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format "<storage_api_host>|<project_id>|<token>;..."`)
+		return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","provider":""}]'`)
 	}
+
+	for _, p := range projects {
+		initProject(p)
+	}
+
 	return nil
 }
