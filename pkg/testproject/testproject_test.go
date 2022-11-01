@@ -119,12 +119,6 @@ func TestGetProjectsFrom_EmptyArray(t *testing.T) {
 	assert.ErrorContains(t, err, `please specify one or more Keboola Connection testing projects in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
 }
 
-func TestGetProjectsFrom_Invalid(t *testing.T) {
-	t.Parallel()
-	_, err := GetProjectsFrom(`[{"project": 5678, "host": "connection.keboola.com", "stagingStorage": "s3"}]`)
-	assert.ErrorContains(t, err, `initialization of project "5678" failed: Key: 'Definition.Token' Error:Field validation for 'Token' failed on the 'required' tag`)
-}
-
 func TestGetProjectsFrom_MissingToken(t *testing.T) {
 	t.Parallel()
 	_, err := GetProjectsFrom(`[{"project": 5678, "host": "connection.keboola.com", "stagingStorage": "s3"}]`)
