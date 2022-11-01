@@ -33,6 +33,11 @@ import (
 	"github.com/gofrs/flock"
 )
 
+const (
+	StagingStorageABS = "abs"
+	StagingStorageS3  = "s3"
+)
+
 var pool ProjectsPool        // nolint gochecknoglobals
 var poolLock = &sync.Mutex{} // nolint gochecknoglobals
 
@@ -69,6 +74,18 @@ type config struct {
 // TInterface is cleanup part of the *testing.T.
 type TInterface interface {
 	Cleanup(f func())
+}
+
+func WithStagingStorageABS() Option {
+	return func(c *config) {
+		c.stagingStorage = StagingStorageABS
+	}
+}
+
+func WithStagingStorageS3() Option {
+	return func(c *config) {
+		c.stagingStorage = StagingStorageS3
+	}
 }
 
 func WithStagingStorage(stagingStorage string) Option {
