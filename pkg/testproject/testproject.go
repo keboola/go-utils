@@ -25,6 +25,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-playground/locales/en"
+	ut "github.com/go-playground/universal-translator"
+	"github.com/go-playground/validator/v10"
+	enTranslation "github.com/go-playground/validator/v10/translations/en"
 	"github.com/gofrs/flock"
 )
 
@@ -172,7 +176,12 @@ func (p *Project) unlock() {
 }
 
 // initProject - init test project handler and lock it.
-func initProject(project *Project) {
+func initProject(project *Project, validate *validator.Validate) error {
+	err := validate.Struct(project)
+	if err != nil {
+		return err
+	}
+
 	// Get locks dir name
 	lockDirName, found := os.LookupEnv("TEST_KBC_PROJECTS_LOCK_DIR_NAME")
 	if !found {
@@ -192,6 +201,8 @@ func initProject(project *Project) {
 
 	project.lock = &sync.Mutex{}
 	project.fsLock = flock.New(lockPath)
+
+	return nil
 }
 
 func resetProjects() {
@@ -225,8 +236,16 @@ func initProjects() error {
 		return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
 	}
 
+	validate := validator.New()
+	translator := ut.New(en.New()).GetFallback()
+	if err := enTranslation.RegisterDefaultTranslations(validate, translator); err != nil {
+		panic(err)
+	}
 	for _, p := range projects {
-		initProject(p)
+		err := initProject(p, validate)
+		if err != nil {
+			return fmt.Errorf(`initialization of project %d failed: %w`, p.ProjectID, err)
+		}
 	}
 
 	return nil

@@ -117,3 +117,18 @@ func TestGetTestProjectProvider_Missing(t *testing.T) {
 	_, _, err := GetTestProject(WithStagingStorage("gcs"))
 	assert.ErrorContains(t, err, `no test project for staging storage gcs`)
 }
+
+//nolint:paralleltest
+func TestGetTestProjectProvider_Invalid(t *testing.T) {
+	resetProjects()
+	def := &Project{
+		Host:           "connection.keboola.com",
+		StagingStorage: "s3",
+		ProjectID:      5678,
+	}
+	j, _ := json.Marshal([]*Project{def})
+	_ = os.Setenv("TEST_KBC_PROJECTS", string(j)) //nolint:forbidigo
+
+	_, _, err := GetTestProject()
+	assert.ErrorContains(t, err, `initialization of project 5678 failed: Key: 'Project.Token' Error:Field validation for 'Token' failed on the 'required' tag`)
+}
