@@ -6,9 +6,11 @@
 //
 // Only one test can access the project at a time. See GetTestProject function.
 // If there is no unlocked project, the function waits until a project is released.
-// Project lock is automatically released at the end of the test.
 //
 // Package can be safely used in parallel tests that run on a single host.
+// Use GetTestProjectForTest function to get a testing project in a test.
+// Project lock is automatically released at the end of the test.
+//
 // Locking between multiple hosts is not provided.
 //
 // The state of the project does not change automatically,
@@ -22,7 +24,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/go-playground/locales/en"
@@ -32,31 +33,70 @@ import (
 	"github.com/gofrs/flock"
 )
 
-var projects []*Project      // nolint gochecknoglobals
-var initLock = &sync.Mutex{} // nolint gochecknoglobals
+var pool ProjectsPool        // nolint gochecknoglobals
+var poolLock = &sync.Mutex{} // nolint gochecknoglobals
+
+// ProjectsPool a group of testing projects.
+type ProjectsPool []*Project
 
 // Project represents a testing project for E2E tests.
 type Project struct {
+	definition Definition
+	fsLock     *flock.Flock // fsLock between processes
+	lock       *sync.Mutex  // lock between goroutines
+	locked     bool
+}
+
+// Definition is project Definition parsed from the ENV.
+type Definition struct {
 	Host           string `json:"host" validate:"required"`
 	Token          string `json:"token" validate:"required"`
 	StagingStorage string `json:"stagingStorage" validate:"required"`
 	ProjectID      int    `json:"project" validate:"required"`
-
-	fsLock *flock.Flock `json:"-"` // fsLock between processes
-	lock   *sync.Mutex  `json:"-"` // lock between goroutines
-	locked bool         `json:"-"`
 }
 
+// UnlockFn must be called if the project is no longer used.
 type UnlockFn func()
+
+// Option for the GetTestProjectForTest and GetTestProject functions.
+type Option func(c *config)
+
+// config for the GetTestProjectForTest and GetTestProject functions.
+type config struct {
+	stagingStorage string
+}
+
+// TInterface is cleanup part of the *testing.T.
+type TInterface interface {
+	Cleanup(f func())
+}
+
+func WithStagingStorage(stagingStorage string) Option {
+	return func(c *config) {
+		c.stagingStorage = stagingStorage
+	}
+}
 
 // GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // Project lock is automatically released at the end of the test.
 // If no project is available, the function waits until a project is released.
-func GetTestProjectForTest(t *testing.T, opts ...Option) (*Project, error) {
-	t.Helper()
+func GetTestProjectForTest(t TInterface, opts ...Option) (*Project, error) {
+	return mustGetProjects().GetTestProjectForTest(t, opts...)
+}
 
+// GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
+// The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
+// If no project is available, the function waits until a project is released.
+func GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
+	return mustGetProjects().GetTestProject(opts...)
+}
+
+// GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
+// Project lock is automatically released at the end of the test.
+// If no project is available, the function waits until a project is released.
+func (v ProjectsPool) GetTestProjectForTest(t TInterface, opts ...Option) (*Project, error) {
 	// Get project
-	p, unlockFn, err := GetTestProject(opts...)
+	p, unlockFn, err := v.GetTestProject(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -69,41 +109,24 @@ func GetTestProjectForTest(t *testing.T, opts ...Option) (*Project, error) {
 	return p, nil
 }
 
-type Option func(c *config)
-
-type config struct {
-	stagingStorage string
-}
-
-func WithStagingStorage(stagingStorage string) Option {
-	return func(c *config) {
-		c.stagingStorage = stagingStorage
-	}
-}
-
 // GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
 // If no project is available, the function waits until a project is released.
-func GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
+func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
 	c := &config{}
 	for _, opt := range opts {
 		opt(c)
 	}
 
-	err := initProjects()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(projects) == 0 {
+	if len(v) == 0 {
 		return nil, nil, fmt.Errorf(`no test project`)
 	}
 
 	for {
 		// Try to find a free project
 		anyProjectFound := false
-		for _, p := range projects {
-			if c.stagingStorage == "" || p.StagingStorage == c.stagingStorage {
+		for _, p := range v {
+			if c.stagingStorage == "" || p.definition.StagingStorage == c.stagingStorage {
 				if p.tryLock() {
 					return p, func() {
 						p.unlock()
@@ -125,24 +148,30 @@ func GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
 // ID returns id of the project.
 func (p *Project) ID() int {
 	p.assertLocked()
-	return p.ProjectID
+	return p.definition.ProjectID
 }
 
 // StorageAPIHost returns Storage API host of the project stack.
 func (p *Project) StorageAPIHost() string {
 	p.assertLocked()
-	return p.Host
+	return p.definition.Host
 }
 
 // StorageAPIToken returns Storage API token of the project.
 func (p *Project) StorageAPIToken() string {
 	p.assertLocked()
-	return p.Token
+	return p.definition.Token
+}
+
+// StagingStorage returns staging storage of the project Definition.
+func (p *Project) StagingStorage() string {
+	p.assertLocked()
+	return p.definition.StagingStorage
 }
 
 func (p *Project) assertLocked() {
 	if !p.locked {
-		panic(fmt.Errorf(`test project "%d" is not locked`, p.ProjectID))
+		panic(fmt.Errorf(`test project "%d" is not locked`, p.definition.ProjectID))
 	}
 }
 
@@ -175,11 +204,81 @@ func (p *Project) unlock() {
 	}
 }
 
-// initProject - init test project handler and lock it.
-func initProject(project *Project, validate *validator.Validate) error {
-	err := validate.Struct(project)
+func MustGetProjectsFrom(str string) ProjectsPool {
+	projects, err := GetProjectsFrom(str)
 	if err != nil {
-		return err
+		panic(err)
+	}
+	return projects
+}
+
+func GetProjectsFrom(str string) (ProjectsPool, error) {
+	// No test project
+	if str == "" {
+		return nil, fmt.Errorf(`please specify one or more Keboola Connection testing projects in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
+	}
+
+	// Decode the value
+	defs := make([]Definition, 0)
+	if err := json.Unmarshal([]byte(str), &defs); err != nil {
+		return nil, fmt.Errorf(`decoding failed: %w`, err)
+	}
+
+	// No test project
+	if len(defs) == 0 {
+		return nil, fmt.Errorf(`please specify one or more Keboola Connection testing projects in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
+	}
+
+	// Setup validator
+	validate := validator.New()
+	translator := ut.New(en.New()).GetFallback()
+	if err := enTranslation.RegisterDefaultTranslations(validate, translator); err != nil {
+		return nil, err
+	}
+
+	// Validate definitions
+	projects := make(ProjectsPool, 0)
+	for _, d := range defs {
+		if project, err := newProject(d, validate); err == nil {
+			projects = append(projects, project)
+		} else {
+			return nil, fmt.Errorf(`initialization of project "%d" failed: %w`, d.ProjectID, err)
+		}
+	}
+
+	return projects, nil
+}
+
+func mustGetProjects() ProjectsPool {
+	projects, err := getProjects()
+	if err != nil {
+		panic(err)
+	}
+	return projects
+}
+
+func getProjects() (ProjectsPool, error) {
+	poolLock.Lock()
+	defer poolLock.Unlock()
+
+	// Initialization is run only once per process
+	if pool != nil {
+		return pool, nil
+	}
+
+	// Init projects from the ENV
+	if v, err := GetProjectsFrom(os.Getenv(`TEST_KBC_PROJECTS`)); err == nil { // nolint: forbidigo
+		pool = v // initialization run only once
+		return pool, nil
+	} else {
+		return nil, fmt.Errorf("invalid TEST_KBC_PROJECTS env: %w", err)
+	}
+}
+
+// initProject - init test project handler and lock it.
+func newProject(def Definition, validate *validator.Validate) (*Project, error) {
+	if err := validate.Struct(def); err != nil {
+		return nil, err
 	}
 
 	// Get locks dir name
@@ -192,61 +291,12 @@ func initProject(project *Project, validate *validator.Validate) error {
 	// Create locks dir if not exists
 	locksDir := filepath.Join(os.TempDir(), lockDirName)
 	if err := os.MkdirAll(locksDir, 0o700); err != nil {
-		panic(fmt.Errorf(`cannot lock test project: %w`, err))
+		return nil, fmt.Errorf(`cannot create locks dir: %w`, err)
 	}
 
-	// lock file name
-	lockFile := project.Host + `-` + strconv.Itoa(project.ProjectID) + `.lock`
+	// Get lock file name
+	lockFile := def.Host + `-` + strconv.Itoa(def.ProjectID) + `.lock`
 	lockPath := filepath.Join(locksDir, lockFile)
 
-	project.lock = &sync.Mutex{}
-	project.fsLock = flock.New(lockPath)
-
-	return nil
-}
-
-func resetProjects() {
-	initLock.Lock()
-	defer initLock.Unlock()
-	projects = nil
-}
-
-func initProjects() error {
-	initLock.Lock()
-	defer initLock.Unlock()
-
-	// Init only once
-	if projects != nil {
-		return nil
-	}
-
-	projects = make([]*Project, 0)
-	if def, found := os.LookupEnv(`TEST_KBC_PROJECTS`); found {
-		if def == "" {
-			return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
-		}
-		err := json.Unmarshal([]byte(def), &projects)
-		if err != nil {
-			return fmt.Errorf(`decoding of env var TEST_KBC_PROJECTS failed: %w`, err)
-		}
-	}
-
-	// No test project
-	if len(projects) == 0 {
-		return fmt.Errorf(`please specify one or more Keboola Connection testing projects by TEST_KBC_PROJECTS env, in format '[{"host":"","token":"","project":"","stagingStorage":""}]'`)
-	}
-
-	validate := validator.New()
-	translator := ut.New(en.New()).GetFallback()
-	if err := enTranslation.RegisterDefaultTranslations(validate, translator); err != nil {
-		panic(err)
-	}
-	for _, p := range projects {
-		err := initProject(p, validate)
-		if err != nil {
-			return fmt.Errorf(`initialization of project %d failed: %w`, p.ProjectID, err)
-		}
-	}
-
-	return nil
+	return &Project{definition: def, lock: &sync.Mutex{}, fsLock: flock.New(lockPath)}, nil
 }
