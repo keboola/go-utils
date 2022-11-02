@@ -94,7 +94,7 @@ func ExampleWithStagingStorage() {
 
 func TestGetTestProject_WithStagingStorage(t *testing.T) {
 	t.Parallel()
-	project1, unlockFn1, _ := MustGetProjectsFrom(projectsForTest()).GetTestProject(WithStagingStorage("abs"))
+	project1, unlockFn1, _ := MustGetProjectsFrom(projectsForTest()).GetTestProject(WithStagingStorageABS())
 	defer unlockFn1()
 	assert.Equal(t, 3456, project1.ID())
 }
