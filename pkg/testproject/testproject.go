@@ -35,6 +35,7 @@ import (
 
 const (
 	StagingStorageABS = "abs"
+	StagingStorageGCS = "gcs"
 	StagingStorageS3  = "s3"
 )
 
@@ -79,6 +80,12 @@ type TInterface interface {
 func WithStagingStorageABS() Option {
 	return func(c *config) {
 		c.stagingStorage = StagingStorageABS
+	}
+}
+
+func WithStagingStorageGCS() Option {
+	return func(c *config) {
+		c.stagingStorage = StagingStorageGCS
 	}
 }
 
