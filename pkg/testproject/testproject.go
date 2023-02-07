@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,8 @@ const (
 	StagingStorageGCS = "gcs"
 	StagingStorageS3  = "s3"
 )
+
+const QueueV1 = "v1"
 
 var pool ProjectsPool        // nolint gochecknoglobals
 var poolLock = &sync.Mutex{} // nolint gochecknoglobals
@@ -59,6 +62,7 @@ type Definition struct {
 	Token          string `json:"token" validate:"required"`
 	StagingStorage string `json:"stagingStorage" validate:"required"`
 	ProjectID      int    `json:"project" validate:"required"`
+	Queue          string `json:"queue,omitempty"`
 }
 
 // UnlockFn must be called if the project is no longer used.
@@ -70,6 +74,7 @@ type Option func(c *config)
 // config for the GetTestProjectForTest and GetTestProject functions.
 type config struct {
 	stagingStorage string
+	queueV1        bool
 }
 
 // TInterface is cleanup part of the *testing.T.
@@ -99,6 +104,29 @@ func WithStagingStorage(stagingStorage string) Option {
 	return func(c *config) {
 		c.stagingStorage = stagingStorage
 	}
+}
+
+func WithQueueV1() Option {
+	return func(c *config) {
+		c.queueV1 = true
+	}
+}
+
+func (c *config) IsCompatible(p *Project) bool {
+	matchStagingStorage := len(c.stagingStorage) == 0 || p.definition.StagingStorage == c.stagingStorage
+	matchQueue := !c.queueV1 || p.definition.Queue == QueueV1
+	return matchStagingStorage && matchQueue
+}
+
+func (c *config) String() string {
+	out := []string{}
+	if len(c.stagingStorage) > 0 {
+		out = append(out, fmt.Sprintf("staging storage %s", c.stagingStorage))
+	}
+	if c.queueV1 {
+		out = append(out, "queue v1")
+	}
+	return strings.Join(out, " and ")
 }
 
 // GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
@@ -150,7 +178,7 @@ func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error)
 		// Try to find a free project
 		anyProjectFound := false
 		for _, p := range v {
-			if c.stagingStorage == "" || p.definition.StagingStorage == c.stagingStorage {
+			if c.IsCompatible(p) {
 				if p.tryLock() {
 					return p, func() {
 						p.unlock()
@@ -161,7 +189,7 @@ func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error)
 		}
 
 		if !anyProjectFound {
-			return nil, nil, fmt.Errorf(fmt.Sprintf(`no test project for staging storage %s`, c.stagingStorage))
+			return nil, nil, fmt.Errorf(fmt.Sprintf(`no test project found with %s`, c.String()))
 		}
 
 		// No free project -> wait
