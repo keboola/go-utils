@@ -111,7 +111,7 @@ func TestGetTestProject_NoProjectForStagingStorage(t *testing.T) {
 	projects, err := GetProjectsFrom(`[{"project": 5678, "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3"}]`)
 	assert.NoError(t, err)
 	_, _, err = projects.GetTestProject(WithStagingStorage("gcs"))
-	assert.ErrorContains(t, err, `no test project found with staging storage gcs`)
+	assert.ErrorContains(t, err, `no compatible test project found (staging storage gcs)`)
 }
 
 func TestGetTestProject_NoProjectWithQueueV1(t *testing.T) {
@@ -119,7 +119,15 @@ func TestGetTestProject_NoProjectWithQueueV1(t *testing.T) {
 	projects, err := GetProjectsFrom(`[{"project": 5678, "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3"}]`)
 	assert.NoError(t, err)
 	_, _, err = projects.GetTestProject(WithQueueV1())
-	assert.ErrorContains(t, err, `no test project found with queue v1`)
+	assert.ErrorContains(t, err, `no compatible test project found (queue v1)`)
+}
+
+func TestGetTestProject_NoProjectWithoutQueueV1(t *testing.T) {
+	t.Parallel()
+	projects, err := GetProjectsFrom(`[{"project": 5678, "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3", "queue": "v1"}]`)
+	assert.NoError(t, err)
+	_, _, err = projects.GetTestProject()
+	assert.ErrorContains(t, err, `no compatible test project found`)
 }
 
 func TestGetTestProject_NoProjectWithStagingStorageABSAndQueueV1(t *testing.T) {
@@ -127,7 +135,7 @@ func TestGetTestProject_NoProjectWithStagingStorageABSAndQueueV1(t *testing.T) {
 	projects, err := GetProjectsFrom(`[{"project": 5678, "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3"}]`)
 	assert.NoError(t, err)
 	_, _, err = projects.GetTestProject(WithStagingStorageABS(), WithQueueV1())
-	assert.ErrorContains(t, err, `no test project found with staging storage abs and queue v1`)
+	assert.ErrorContains(t, err, `no compatible test project found (staging storage abs, queue v1)`)
 }
 
 func TestGetProjectsFrom_EmptyString(t *testing.T) {
