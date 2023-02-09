@@ -114,7 +114,12 @@ func WithQueueV1() Option {
 
 func (c *config) IsCompatible(p *Project) bool {
 	matchStagingStorage := len(c.stagingStorage) == 0 || p.definition.StagingStorage == c.stagingStorage
-	matchQueue := !c.queueV1 || p.definition.Queue == QueueV1
+	matchQueue := false
+	if c.queueV1 {
+		matchQueue = p.definition.Queue == QueueV1
+	} else {
+		matchQueue = p.definition.Queue != QueueV1
+	}
 	return matchStagingStorage && matchQueue
 }
 
@@ -126,7 +131,7 @@ func (c *config) String() string {
 	if c.queueV1 {
 		out = append(out, "queue v1")
 	}
-	return strings.Join(out, " and ")
+	return "(" + strings.Join(out, ", ") + ")"
 }
 
 // GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
@@ -189,7 +194,7 @@ func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error)
 		}
 
 		if !anyProjectFound {
-			return nil, nil, fmt.Errorf(fmt.Sprintf(`no test project found with %s`, c.String()))
+			return nil, nil, fmt.Errorf(fmt.Sprintf(`no compatible test project found %s`, c.String()))
 		}
 
 		// No free project -> wait
