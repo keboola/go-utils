@@ -19,12 +19,17 @@ func (o *OrderedMap) MarshalYAML() (any, error) {
 		}
 
 		// Encode value
-		valueNode := &yaml.Node{Kind: yaml.ScalarNode}
-		node.Content = append(node.Content, valueNode)
-		err := valueNode.Encode(value)
-		if err != nil {
-			return nil, err
+		var valueNode *yaml.Node
+		if v, ok := value.(*yaml.Node); ok {
+			valueNode = v
+		} else {
+			valueNode = &yaml.Node{Kind: yaml.ScalarNode}
+			if err := valueNode.Encode(value); err != nil {
+				return nil, err
+			}
 		}
+
+		node.Content = append(node.Content, valueNode)
 	}
 
 	return node, nil

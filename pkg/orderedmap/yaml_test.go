@@ -23,7 +23,7 @@ func TestOrderedMap_MarshalYAML(t *testing.T) {
 	o.Set("number", 4)
 	// keys not sorted alphabetically
 	o.Set("z", 1)
-	o.Set("a", 2)
+	o.Set("a", &yaml.Node{Kind: yaml.ScalarNode, Value: "2", LineComment: "my comment"})
 	o.Set("b", 3)
 	// slice
 	o.Set("slice", []any{
@@ -44,7 +44,7 @@ number: 4
 string: x
 specialstring: \.<>[]{}_-
 z: 1
-a: 2
+a: 2 # my comment
 b: 3
 slice:
   - "1"
