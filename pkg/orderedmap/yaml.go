@@ -9,27 +9,26 @@ import (
 func (o *OrderedMap) MarshalYAML() (any, error) {
 	node := &yaml.Node{Kind: yaml.MappingNode}
 	for _, key := range o.Keys() {
-		value, _ := o.Get(key)
-
 		// Encode key
 		keyNode := &yaml.Node{Kind: yaml.MappingNode}
-		node.Content = append(node.Content, keyNode)
 		if err := keyNode.Encode(key); err != nil {
 			return nil, err
 		}
 
 		// Encode value
-		var valueNode *yaml.Node
-		if v, ok := value.(*yaml.Node); ok {
-			valueNode = v
-		} else {
-			valueNode = &yaml.Node{Kind: yaml.ScalarNode}
-			if err := valueNode.Encode(value); err != nil {
-				return nil, err
-			}
+		value, _ := o.Get(key)
+		valueNode, err := encodeYamlValue(value)
+		if err != nil {
+			return nil, err
 		}
 
-		node.Content = append(node.Content, valueNode)
+		// Move head comment from the value to the key node, if any
+		if valueNode.HeadComment != "" {
+			keyNode.HeadComment = valueNode.HeadComment
+			valueNode.HeadComment = ""
+		}
+
+		node.Content = append(node.Content, keyNode, valueNode)
 	}
 
 	return node, nil
@@ -72,6 +71,35 @@ func (o *OrderedMap) UnmarshalYAML(node *yaml.Node) error {
 	}
 
 	return nil
+}
+
+func encodeYamlValue(value any) (out *yaml.Node, err error) {
+	switch v := value.(type) {
+	case *yaml.Node:
+		return v, nil
+	case *OrderedMap:
+		if subNode, err := v.MarshalYAML(); err == nil {
+			return subNode.(*yaml.Node), nil
+		} else {
+			return nil, err
+		}
+	case []any:
+		out = &yaml.Node{Kind: yaml.SequenceNode}
+		for _, item := range v {
+			if subNode, err := encodeYamlValue(item); err == nil {
+				out.Content = append(out.Content, subNode)
+			} else {
+				return nil, err
+			}
+		}
+		return out, nil
+	default:
+		out = &yaml.Node{Kind: yaml.ScalarNode}
+		if err := out.Encode(value); err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
 }
 
 func decodeYamlValue(node *yaml.Node, out *any) error {

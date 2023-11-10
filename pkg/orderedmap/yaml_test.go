@@ -23,17 +23,17 @@ func TestOrderedMap_MarshalYAML(t *testing.T) {
 	o.Set("number", 4)
 	// keys not sorted alphabetically
 	o.Set("z", 1)
-	o.Set("a", &yaml.Node{Kind: yaml.ScalarNode, Value: "2", LineComment: "my comment"})
+	o.Set("a", &yaml.Node{Kind: yaml.ScalarNode, Value: "2", LineComment: "line comment"})
 	o.Set("b", 3)
 	// slice
 	o.Set("slice", []any{
-		"1",
-		1,
+		&yaml.Node{Kind: yaml.ScalarNode, Value: "1", Style: yaml.DoubleQuotedStyle, HeadComment: "head comment"},
+		&yaml.Node{Kind: yaml.ScalarNode, Value: "1", LineComment: "line comment"},
 	})
 	// orderedmap
 	v := New()
-	v.Set("e", 1)
-	v.Set("a", 2)
+	v.Set("e", &yaml.Node{Kind: yaml.ScalarNode, Value: "1", LineComment: "line comment"})
+	v.Set("a", &yaml.Node{Kind: yaml.ScalarNode, Value: "2", HeadComment: "head comment"})
 	o.Set("orderedmap", v)
 	// escape key
 	o.Set("test\n\r\t\\\"ing", 9)
@@ -44,13 +44,15 @@ number: 4
 string: x
 specialstring: \.<>[]{}_-
 z: 1
-a: 2 # my comment
+a: 2 # line comment
 b: 3
 slice:
+  # head comment
   - "1"
-  - 1
+  - 1 # line comment
 orderedmap:
-  e: 1
+  e: 1 # line comment
+  # head comment
   a: 2
 ? "test\n\r\t\\\"ing"
 : 9
