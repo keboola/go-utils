@@ -38,6 +38,9 @@ const (
 	StagingStorageABS = "abs"
 	StagingStorageGCS = "gcs"
 	StagingStorageS3  = "s3"
+
+	BackendSnowflake = "snowflake"
+	BackendBigQuery  = "bigquery"
 )
 
 const QueueV1 = "v1"
@@ -61,6 +64,7 @@ type Definition struct {
 	Host           string `json:"host" validate:"required"`
 	Token          string `json:"token" validate:"required"`
 	StagingStorage string `json:"stagingStorage" validate:"required"`
+	Backend        string `json:"backend"`
 	ProjectID      int    `json:"project" validate:"required"`
 	Queue          string `json:"queue,omitempty"`
 }
@@ -73,6 +77,7 @@ type Option func(c *config)
 
 // config for the GetTestProjectForTest and GetTestProject functions.
 type config struct {
+	backend        string
 	stagingStorage string
 	queueV1        bool
 }
@@ -112,6 +117,18 @@ func WithQueueV1() Option {
 	}
 }
 
+func WithSnowflakeBackend() Option {
+	return func(c *config) {
+		c.backend = BackendSnowflake
+	}
+}
+
+func WithBigQueryBackend() Option {
+	return func(c *config) {
+		c.backend = BackendBigQuery
+	}
+}
+
 func (c *config) IsCompatible(p *Project) bool {
 	matchStagingStorage := len(c.stagingStorage) == 0 || p.definition.StagingStorage == c.stagingStorage
 	matchQueue := false
@@ -120,7 +137,12 @@ func (c *config) IsCompatible(p *Project) bool {
 	} else {
 		matchQueue = p.definition.Queue != QueueV1
 	}
-	return matchStagingStorage && matchQueue
+
+	matchBackend := false
+	if len(c.backend) == 0 || p.definition.Backend == c.backend {
+		matchBackend = true
+	}
+	return matchStagingStorage && matchQueue && matchBackend
 }
 
 func (c *config) String() string {
