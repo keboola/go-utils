@@ -64,7 +64,7 @@ type Definition struct {
 	Host           string `json:"host" validate:"required"`
 	Token          string `json:"token" validate:"required"`
 	StagingStorage string `json:"stagingStorage" validate:"required"`
-	Backend        string `json:"backend"`
+	Backend        string `json:"backend" validate:"required"`
 	ProjectID      int    `json:"project" validate:"required"`
 	Queue          string `json:"queue,omitempty"`
 }
@@ -131,17 +131,11 @@ func WithBigQueryBackend() Option {
 
 func (c *config) IsCompatible(p *Project) bool {
 	matchStagingStorage := len(c.stagingStorage) == 0 || p.definition.StagingStorage == c.stagingStorage
-	matchQueue := false
-	if c.queueV1 {
-		matchQueue = p.definition.Queue == QueueV1
-	} else {
-		matchQueue = p.definition.Queue != QueueV1
-	}
 
-	matchBackend := false
-	if len(c.backend) == 0 || p.definition.Backend == c.backend {
-		matchBackend = true
-	}
+	matchQueue := (p.definition.Queue == QueueV1) == c.queueV1 // QueueV2 is required, if QueueV1 is not explicitly requested
+
+	matchBackend := len(c.backend) == 0 || p.definition.Backend == c.backend
+
 	return matchStagingStorage && matchQueue && matchBackend
 }
 
