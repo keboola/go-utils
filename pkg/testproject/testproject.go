@@ -242,6 +242,12 @@ func (p *Project) StagingStorage() string {
 	return p.definition.StagingStorage
 }
 
+// Backend returns backend of the project Definition.
+func (p *Project) Backend() string {
+	p.assertLocked()
+	return p.definition.Backend
+}
+
 func (p *Project) assertLocked() {
 	if !p.locked {
 		panic(fmt.Errorf(`test project "%d" is not locked`, p.definition.ProjectID))
