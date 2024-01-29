@@ -144,9 +144,15 @@ func (c *config) String() string {
 	if len(c.stagingStorage) > 0 {
 		out = append(out, fmt.Sprintf("staging storage %s", c.stagingStorage))
 	}
+
 	if c.queueV1 {
 		out = append(out, "queue v1")
 	}
+
+	if len(c.backend) > 0 {
+		out = append(out, fmt.Sprintf("backend %s", c.backend))
+	}
+
 	return "(" + strings.Join(out, ", ") + ")"
 }
 
