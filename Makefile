@@ -1,7 +1,7 @@
 .PHONY: build
 
-install-tools:
-	bash ./scripts/install-tools.sh
+tools:
+	bash ./scripts/tools.sh
 
 lint:
 	bash ./scripts/lint.sh
