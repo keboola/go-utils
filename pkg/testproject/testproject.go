@@ -61,12 +61,13 @@ type Project struct {
 
 // Definition is project Definition parsed from the ENV.
 type Definition struct {
-	Host           string `json:"host" validate:"required"`
-	Token          string `json:"token" validate:"required"`
-	StagingStorage string `json:"stagingStorage" validate:"required"`
-	Backend        string `json:"backend" validate:"required"`
-	ProjectID      int    `json:"project" validate:"required"`
-	Queue          string `json:"queue,omitempty"`
+	Host                 string `json:"host" validate:"required"`
+	Token                string `json:"token" validate:"required"`
+	StagingStorage       string `json:"stagingStorage" validate:"required"`
+	Backend              string `json:"backend" validate:"required"`
+	ProjectID            int    `json:"project" validate:"required"`
+	LegacyTransformation bool   `json:"legacyTransformation"`
+	Queue                string `json:"queue,omitempty"`
 }
 
 // UnlockFn must be called if the project is no longer used.
@@ -77,9 +78,10 @@ type Option func(c *config)
 
 // config for the GetTestProjectForTest and GetTestProject functions.
 type config struct {
-	backend        string
-	stagingStorage string
-	queueV1        bool
+	backend              string
+	stagingStorage       string
+	legacyTransformation bool
+	queueV1              bool
 }
 
 // TInterface is cleanup part of the *testing.T.
@@ -129,6 +131,12 @@ func WithBigQueryBackend() Option {
 	}
 }
 
+func WithLegacyTransformation() Option {
+	return func(c *config) {
+		c.legacyTransformation = true
+	}
+}
+
 func (c *config) IsCompatible(p *Project) bool {
 	matchStagingStorage := len(c.stagingStorage) == 0 || p.definition.StagingStorage == c.stagingStorage
 
@@ -136,7 +144,9 @@ func (c *config) IsCompatible(p *Project) bool {
 
 	matchBackend := len(c.backend) == 0 || p.definition.Backend == c.backend
 
-	return matchStagingStorage && matchQueue && matchBackend
+	matchLegacyTransformation := !c.legacyTransformation || p.definition.LegacyTransformation == c.legacyTransformation
+
+	return matchStagingStorage && matchQueue && matchBackend && matchLegacyTransformation
 }
 
 func (c *config) String() string {
@@ -151,6 +161,10 @@ func (c *config) String() string {
 
 	if len(c.backend) > 0 {
 		out = append(out, fmt.Sprintf("backend %s", c.backend))
+	}
+
+	if c.legacyTransformation {
+		out = append(out, fmt.Sprintf("legacy transformation %v", c.legacyTransformation))
 	}
 
 	return "(" + strings.Join(out, ", ") + ")"
@@ -252,6 +266,12 @@ func (p *Project) StagingStorage() string {
 func (p *Project) Backend() string {
 	p.assertLocked()
 	return p.definition.Backend
+}
+
+// LegacyTransformation returns support of legacy transformations of the project Definition.
+func (p *Project) LegacyTransformation() bool {
+	p.assertLocked()
+	return p.definition.LegacyTransformation
 }
 
 func (p *Project) assertLocked() {
