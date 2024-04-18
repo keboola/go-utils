@@ -42,6 +42,31 @@ linters-settings:
       # Instead of "zap" package use "internal/log" package
       - ^zap\.
 
+  depguard:
+    rules:
+      errors:
+        list-mode: lax
+        files:
+          - "!**/internal/pkg/utils/errors/*"
+        deny:
+          - pkg: errors
+            desc: 'please use the package "github.com/keboola/keboola-as-code/internal/pkg/utils/errors"'
+      zap:
+        list-mode: lax
+        files:
+          - "!**/internal/pkg/log/*"
+          - "!**/internal/pkg/service/common/ctxattr/*"
+        deny:
+          - pkg: go.uber.org/zap
+            desc: 'please use "github.com/keboola/keboola-as-code/internal/pkg/log" package'
+      aferocopy:
+        list-mode: lax
+        files:
+          - "!**/internal/pkg/filesystem/aferofs/*"
+        deny:
+          - pkg: go.nhat.io/aferocopy/*
+            desc: 'please use "aferofs.CopyFs2Fs" function'
+
 # https://golangci-lint.run/usage/linters
 linters:
   disable-all: true

@@ -15,7 +15,7 @@ jobs:
 
       - name: Install tools
         run: |
-          make install-tools
+          make tools
 
       - name: Lint and test
         run: |
