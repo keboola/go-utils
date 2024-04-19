@@ -44,13 +44,6 @@ linters-settings:
 
   depguard:
     rules:
-      errors:
-        list-mode: lax
-        files:
-          - "!**/internal/pkg/utils/errors/*"
-        deny:
-          - pkg: errors
-            desc: 'please use the package "github.com/keboola/keboola-as-code/internal/pkg/utils/errors"'
       zap:
         list-mode: lax
         files:

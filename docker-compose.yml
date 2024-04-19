@@ -5,9 +5,21 @@ services:
     build: .
     ports:
       - "6060:6060"
+    environment:
+      - TEST_KBC_PROJECTS_LOCK_HOST
+      - TEST_KBC_PROJECTS_LOCK_PASSWORD
     volumes:
       - ./:/code:z
       - cache:/tmp/cache
-
+  redis:
+    hostname: redis
+    image: redis
+    command: ["redis-server", "/etc/redis/redis.conf"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis.conf:/etc/redis/redis.conf
+    environment:
+      REDIS_PORT: 6379
 volumes:
   cache:
