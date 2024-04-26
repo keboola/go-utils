@@ -1,8 +1,8 @@
 // Package testproject implements locking of Keboola Projects for E2E parallel tests.
 //
 // Project is locked:
-// - at the host level (flock.Flock)
-// - at the goroutines level (sync.Mutex)
+// - at locker level (redislock) OR
+// - at the host level (flock.Flock) AND at the goroutines level (sync.Mutex)
 //
 // Only one test can access the project at a time. See GetTestProject function.
 // If there is no unlocked project, the function waits until a project is released.
@@ -19,10 +19,9 @@ package testproject
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,7 +30,6 @@ import (
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	enTranslation "github.com/go-playground/validator/v10/translations/en"
-	"github.com/gofrs/flock"
 )
 
 const (
@@ -39,14 +37,29 @@ const (
 	StagingStorageGCS = "gcs"
 	StagingStorageS3  = "s3"
 
-	BackendSnowflake = "snowflake"
-	BackendBigQuery  = "bigquery"
+	BackendSnowflake               = "snowflake"
+	BackendBigQuery                = "bigquery"
+	TestKbcProjectsKey             = "TEST_KBC_PROJECTS"
+	TestKbcProjectsLockDirNameKey  = "TEST_KBC_PROJECTS_LOCK_DIR_NAME"
+	TestKbcProjectsLockHostKey     = "TEST_KBC_PROJECTS_LOCK_HOST"
+	TestKbcProjectsLockPasswordKey = "TEST_KBC_PROJECTS_LOCK_PASSWORD"
+	TestKbcProjectsLockTLSKey      = "TEST_KBC_PROJECTS_LOCK_TLS"
 )
 
 const QueueV1 = "v1"
 
-var pool ProjectsPool        // nolint gochecknoglobals
+var pool *ProjectsPool       // nolint gochecknoglobals
 var poolLock = &sync.Mutex{} // nolint gochecknoglobals
+
+type locker interface {
+	newForProject(p *Project) projectLocker
+}
+
+type projectLocker interface {
+	tryLock() bool
+	unlock()
+	isLocked() bool
+}
 
 // ProjectsPool a group of testing projects.
 type ProjectsPool []*Project
@@ -54,9 +67,7 @@ type ProjectsPool []*Project
 // Project represents a testing project for E2E tests.
 type Project struct {
 	definition Definition
-	fsLock     *flock.Flock // fsLock between processes
-	lock       *sync.Mutex  // lock between goroutines
-	locked     bool
+	locker     projectLocker
 }
 
 // Definition is project Definition parsed from the ENV.
@@ -220,11 +231,13 @@ func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error)
 		anyProjectFound := false
 		for _, p := range v {
 			if c.IsCompatible(p) {
-				if p.tryLock() {
-					return p, func() {
-						p.unlock()
-					}, nil
+				if p.locker.tryLock() {
+					unlockFn := func() {
+						p.locker.unlock()
+					}
+					return p, unlockFn, nil
 				}
+
 				anyProjectFound = true
 			}
 		}
@@ -275,37 +288,8 @@ func (p *Project) LegacyTransformation() bool {
 }
 
 func (p *Project) assertLocked() {
-	if !p.locked {
+	if !p.locker.isLocked() {
 		panic(fmt.Errorf(`test project "%d" is not locked`, p.definition.ProjectID))
-	}
-}
-
-func (p *Project) tryLock() bool {
-	// This FS lock works between processes
-	if locked, err := p.fsLock.TryLock(); err != nil {
-		panic(fmt.Errorf(`cannot lock test project: %w`, err))
-	} else if !locked {
-		// Busy
-		return false
-	}
-
-	// This lock works inside one process, between goroutines
-	if !p.lock.TryLock() {
-		// Busy
-		return false
-	}
-
-	// Locked
-	p.locked = true
-	return true
-}
-
-// unlock project if it is no more needed in test.
-func (p *Project) unlock() {
-	defer p.lock.Unlock()
-	p.locked = false
-	if err := p.fsLock.Unlock(); err != nil {
-		panic(fmt.Errorf(`cannot unlock test project: %w`, err))
 	}
 }
 
@@ -341,20 +325,25 @@ func GetProjectsFrom(str string) (ProjectsPool, error) {
 		return nil, err
 	}
 
+	locker, err := newLocker()
+	if err != nil {
+		return nil, err
+	}
+
 	// Validate definitions
-	projects := make(ProjectsPool, 0)
+	pool := make(ProjectsPool, 0)
 	for _, d := range defs {
-		if project, err := newProject(d, validate); err == nil {
-			projects = append(projects, project)
+		if project, err := newProject(locker, d, validate); err == nil {
+			pool = append(pool, project)
 		} else {
-			return nil, fmt.Errorf(`initialization of project "%d" failed: %w`, d.ProjectID, err)
+			return pool, fmt.Errorf(`initialization of project "%d" failed: %w`, d.ProjectID, err)
 		}
 	}
 
-	return projects, nil
+	return pool, nil
 }
 
-func mustGetProjects() ProjectsPool {
+func mustGetProjects() *ProjectsPool {
 	projects, err := getProjects()
 	if err != nil {
 		panic(err)
@@ -362,7 +351,7 @@ func mustGetProjects() ProjectsPool {
 	return projects
 }
 
-func getProjects() (ProjectsPool, error) {
+func getProjects() (*ProjectsPool, error) {
 	poolLock.Lock()
 	defer poolLock.Unlock()
 
@@ -372,36 +361,40 @@ func getProjects() (ProjectsPool, error) {
 	}
 
 	// Init projects from the ENV
-	if v, err := GetProjectsFrom(os.Getenv(`TEST_KBC_PROJECTS`)); err == nil { // nolint: forbidigo
-		pool = v // initialization run only once
+	if v, err := GetProjectsFrom(os.Getenv(TestKbcProjectsKey)); err == nil { // nolint: forbidigo
+		pool = &v // initialization run only once
 		return pool, nil
 	} else {
-		return nil, fmt.Errorf("invalid TEST_KBC_PROJECTS env: %w", err)
+		return nil, fmt.Errorf("error occurred during project pool setup: %w", err)
 	}
 }
 
+func newLocker() (locker, error) {
+	redisHost := os.Getenv(TestKbcProjectsLockHostKey)         // nolint: forbidigo
+	redisPassword := os.Getenv(TestKbcProjectsLockPasswordKey) // nolint: forbidigo
+	if redisHost == "" && redisPassword == "" {
+		locker, err := newFsLocker()
+		return locker, err
+	} else if redisPassword == "" {
+		return nil, errors.New("redis password is required")
+	}
+
+	locker, err := newRedisLocker(redisHost, redisPassword)
+	if err != nil {
+		return nil, err
+	}
+
+	return locker, nil
+}
+
 // initProject - init test project handler and lock it.
-func newProject(def Definition, validate *validator.Validate) (*Project, error) {
+func newProject(l locker, def Definition, validate *validator.Validate) (*Project, error) {
 	if err := validate.Struct(def); err != nil {
 		return nil, err
 	}
 
-	// Get locks dir name
-	lockDirName, found := os.LookupEnv("TEST_KBC_PROJECTS_LOCK_DIR_NAME")
-	if !found {
-		// Default value
-		lockDirName = ".keboola-as-code-locks"
-	}
-
-	// Create locks dir if not exists
-	locksDir := filepath.Join(os.TempDir(), lockDirName)
-	if err := os.MkdirAll(locksDir, 0o700); err != nil {
-		return nil, fmt.Errorf(`cannot create locks dir: %w`, err)
-	}
-
-	// Get lock file name
-	lockFile := def.Host + `-` + strconv.Itoa(def.ProjectID) + `.lock`
-	lockPath := filepath.Join(locksDir, lockFile)
-
-	return &Project{definition: def, lock: &sync.Mutex{}, fsLock: flock.New(lockPath)}, nil
+	p := &Project{definition: def}
+	projectLocker := l.newForProject(p)
+	p.locker = projectLocker
+	return p, nil
 }
