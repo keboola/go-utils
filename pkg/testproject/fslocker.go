@@ -10,13 +10,9 @@ import (
 	"github.com/gofrs/flock"
 )
 
-// fsLocker is implementation of locker using flock and mutex to perform mutual exclusion of project access on both process and goroutine level.
+// fsLocker is factory constructing fsProjectLockers.
 type fsLocker struct {
-	projectID string
-	locksDir  string
-	lock      *sync.Mutex  // lock between goroutines
-	fsLock    *flock.Flock // fsLock between processes
-	locked    bool
+	locksDir string
 }
 
 func newFsLocker() (*fsLocker, error) {
@@ -38,20 +34,29 @@ func newFsLocker() (*fsLocker, error) {
 	}, nil
 }
 
-func (fl *fsLocker) newForProject(p *Project) locker {
+// fsProjectLocker is implementation of locker using flock and mutex to perform mutual exclusion of project access on both process and goroutine level.
+type fsProjectLocker struct {
+	fsLocker  *fsLocker
+	projectID string
+	lock      *sync.Mutex  // lock between goroutines
+	fsLock    *flock.Flock // fsLock between processes
+	locked    bool
+}
+
+func (fl *fsLocker) newForProject(p *Project) projectLocker {
 	// Get lock file name
 	projectID := p.definition.Host + `-` + strconv.Itoa(p.definition.ProjectID) + `.lock`
 	lockPath := filepath.Join(fl.locksDir, projectID)
 	fsLock := flock.New(lockPath)
-	return &fsLocker{
+	return &fsProjectLocker{
+		fsLocker:  fl,
 		projectID: projectID,
-		locksDir:  fl.locksDir,
 		lock:      &sync.Mutex{},
 		fsLock:    fsLock,
 	}
 }
 
-func (fl *fsLocker) tryLock() bool {
+func (fl *fsProjectLocker) tryLock() bool {
 	// This FS lock works between processes
 	if locked, err := fl.fsLock.TryLock(); err != nil {
 		panic(fmt.Errorf(`cannot lock test project: %w`, err))
@@ -72,7 +77,7 @@ func (fl *fsLocker) tryLock() bool {
 }
 
 // unlock project if it is no more needed in test.
-func (fl *fsLocker) unlock() {
+func (fl *fsProjectLocker) unlock() {
 	defer fl.lock.Unlock()
 	fl.locked = false
 	if err := fl.fsLock.Unlock(); err != nil {
@@ -80,6 +85,6 @@ func (fl *fsLocker) unlock() {
 	}
 }
 
-func (fl *fsLocker) isLocked() bool {
+func (fl *fsProjectLocker) isLocked() bool {
 	return fl.locked
 }

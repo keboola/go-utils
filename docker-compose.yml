@@ -6,6 +6,7 @@ services:
     ports:
       - "6060:6060"
     environment:
+      # By default the `fsLocker` is used as .env variables are commented out
       - TEST_KBC_PROJECTS_LOCK_HOST
       - TEST_KBC_PROJECTS_LOCK_PASSWORD
     volumes:

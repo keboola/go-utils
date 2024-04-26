@@ -52,7 +52,10 @@ var pool *ProjectsPool       // nolint gochecknoglobals
 var poolLock = &sync.Mutex{} // nolint gochecknoglobals
 
 type locker interface {
-	newForProject(p *Project) locker
+	newForProject(p *Project) projectLocker
+}
+
+type projectLocker interface {
 	tryLock() bool
 	unlock()
 	isLocked() bool
@@ -64,7 +67,7 @@ type ProjectsPool []*Project
 // Project represents a testing project for E2E tests.
 type Project struct {
 	definition Definition
-	locker     locker
+	locker     projectLocker
 }
 
 // Definition is project Definition parsed from the ENV.

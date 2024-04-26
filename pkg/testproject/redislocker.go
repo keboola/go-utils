@@ -12,13 +12,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// redisLocker is implementation of locker in which the mutual exclusion of project access is done by locking redis unique ID.
+// redisLocker is factory constructing redisProjectLockers.
 type redisLocker struct {
-	projectID   string
 	redisClient *redis.Client
 	locker      *redislock.Client
-	redisLock   *redislock.Lock // lock between projects using redis
-	locked      bool
 }
 
 func newRedisLocker(redisHost, redisPassword string) (*redisLocker, error) {
@@ -51,18 +48,25 @@ func newRedisLocker(redisHost, redisPassword string) (*redisLocker, error) {
 	}, nil
 }
 
-func (rl *redisLocker) newForProject(p *Project) locker {
-	return &redisLocker{
+// redisProjectLocker is implementation of locker in which the mutual exclusion of project access is done by locking redis unique ID.
+type redisProjectLocker struct {
+	redisLocker *redisLocker
+	projectID   string
+	redisLock   *redislock.Lock // lock between projects using redis
+	locked      bool
+}
+
+func (rl *redisLocker) newForProject(p *Project) projectLocker {
+	return &redisProjectLocker{
+		redisLocker: rl,
 		projectID:   fmt.Sprintf("%s-%d", p.definition.Host, p.definition.ProjectID),
-		redisClient: rl.redisClient,
-		locker:      rl.locker,
 	}
 }
 
-func (rl *redisLocker) tryLock() bool {
+func (rl *redisProjectLocker) tryLock() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	lock, err := rl.locker.Obtain(ctx, rl.projectID, 60*time.Second, nil)
+	lock, err := rl.redisLocker.locker.Obtain(ctx, rl.projectID, 60*time.Second, nil)
 	if errors.Is(err, redislock.ErrNotObtained) {
 		return false
 	} else if err != nil {
@@ -74,13 +78,13 @@ func (rl *redisLocker) tryLock() bool {
 	return true
 }
 
-func (rl *redisLocker) unlock() {
+func (rl *redisProjectLocker) unlock() {
 	rl.locked = false
 	if err := rl.redisLock.Release(context.Background()); err != nil {
 		panic(fmt.Errorf(`cannot unlock test project using redis lock: %w`, err))
 	}
 }
 
-func (rl *redisLocker) isLocked() bool {
+func (rl *redisProjectLocker) isLocked() bool {
 	return rl.locked
 }
