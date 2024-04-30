@@ -19,7 +19,7 @@ jobs:
 
       - name: Lint and test
         env: 
-          TEST_KBC_PROJECTS_LOCK_HOST: ${{ secrets.TEST_KBC_PROJECTS_LOCK_HOST }}
+          TEST_KBC_PROJECTS_LOCK_HOST: ${{ vars.TEST_KBC_PROJECTS_LOCK_HOST }}
           TEST_KBC_PROJECTS_LOCK_PASSWORD: ${{ secrets.TEST_KBC_PROJECTS_LOCK_PASSWORD }}
         run: |
           make lint
