@@ -12,6 +12,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	TTL = 60 * time.Second
+)
+
 // redisLocker is factory constructing redisProjectLockers.
 type redisLocker struct {
 	redisClient *redis.Client
@@ -63,19 +67,41 @@ func (rl *redisLocker) newForProject(p *Project) projectLocker {
 	}
 }
 
-func (rl *redisProjectLocker) tryLock() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	lock, err := rl.redisLocker.locker.Obtain(ctx, rl.projectID, 60*time.Second, nil)
+func (rl *redisProjectLocker) tryLock(ctx context.Context) (bool, context.CancelFunc) {
+	ctxWithTimeout, cancelTimeout := context.WithTimeout(ctx, 1*time.Second)
+	defer cancelTimeout()
+	lock, err := rl.redisLocker.locker.Obtain(ctxWithTimeout, rl.projectID, TTL, nil)
 	if errors.Is(err, redislock.ErrNotObtained) {
-		return false
+		return false, nil
 	} else if err != nil {
 		panic(fmt.Errorf(`cannot lock test project using redis lock: %w`, err))
 	}
 
 	rl.redisLock = lock
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	go rl.extendLock(ctxWithCancel)
 	rl.locked = true
-	return true
+	return true, cancel
+}
+
+// extendLock extends the lock forewer when TTL/4 passed.
+// replace implementation with https://github.com/bsm/redislock/pull/73 in future.
+func (rl *redisProjectLocker) extendLock(ctx context.Context) {
+	ticker := time.NewTicker(TTL / 4)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			rl.unlock()
+			return
+
+		case <-ticker.C:
+			err := rl.redisLock.Refresh(ctx, TTL, nil)
+			if err != nil {
+				panic(fmt.Errorf(`cannot extend the redis lock: %w`, err))
+			}
+		}
+	}
 }
 
 func (rl *redisProjectLocker) unlock() {
