@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/bsm/redislock"
@@ -60,9 +59,7 @@ type redisProjectLocker struct {
 	redisLocker *redisLocker
 	projectID   string
 	redisLock   *redislock.Lock // lock between projects using redis
-	cancel      func()
 	locked      bool
-	mu          sync.Mutex
 }
 
 func (rl *redisLocker) newForProject(p *Project) projectLocker {
@@ -72,20 +69,21 @@ func (rl *redisLocker) newForProject(p *Project) projectLocker {
 	}
 }
 
-func (rl *redisProjectLocker) tryLock() bool {
-	lock, err := rl.redisLocker.locker.Obtain(context.Background(), rl.projectID, TTL, nil)
+func (rl *redisProjectLocker) tryLock(ctx context.Context) (bool, context.CancelFunc) {
+	ctxWithTimeout, cancelTimeout := context.WithTimeout(ctx, 1*time.Second)
+	defer cancelTimeout()
+	lock, err := rl.redisLocker.locker.Obtain(ctxWithTimeout, rl.projectID, TTL, nil)
 	if errors.Is(err, redislock.ErrNotObtained) {
-		return false
+		return false, nil
 	} else if err != nil {
 		panic(fmt.Errorf(`cannot lock test project using redis lock: %w`, err))
 	}
 
 	rl.redisLock = lock
-	ctxWithCancel, cancel := context.WithCancel(context.Background())
-	rl.cancel = cancel
+	ctxWithCancel, cancel := context.WithCancel(ctx)
 	go rl.extendLock(ctxWithCancel)
 	rl.locked = true
-	return true
+	return true, cancel
 }
 
 // extendLock extends the lock forewer when TTL/4 passed.
@@ -96,6 +94,7 @@ func (rl *redisProjectLocker) extendLock(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			rl.unlock()
 			return
 
 		case <-ticker.C:
@@ -131,12 +130,6 @@ func (rl *redisProjectLocker) unlock() {
 	rl.locked = false
 	if err := rl.redisLock.Release(context.Background()); err != nil {
 		panic(fmt.Errorf(`cannot unlock test project using redis lock: %w`, err))
-	}
-
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	if rl.cancel != nil {
-		rl.cancel()
 	}
 }
 

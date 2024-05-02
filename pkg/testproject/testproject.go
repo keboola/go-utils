@@ -18,6 +18,7 @@
 package testproject
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -55,8 +56,7 @@ type locker interface {
 }
 
 type projectLocker interface {
-	tryLock() bool
-	unlock()
+	tryLock(ctx context.Context) (bool, context.CancelFunc)
 	isLocked() bool
 }
 
@@ -79,9 +79,6 @@ type Definition struct {
 	LegacyTransformation bool   `json:"legacyTransformation"`
 	IsGuest              bool   `json:"isGuest,omitempty"`
 }
-
-// UnlockFn must be called if the project is no longer used.
-type UnlockFn func()
 
 // Option for the GetTestProjectForTest and GetTestProject functions.
 type Option func(c *config)
@@ -190,7 +187,7 @@ func GetTestProjectForTest(t TInterface, opts ...Option) (*Project, error) {
 // GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
 // If no project is available, the function waits until a project is released.
-func GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
+func GetTestProject(opts ...Option) (*Project, context.CancelFunc, error) {
 	return mustGetProjects().GetTestProject(opts...)
 }
 
@@ -203,14 +200,14 @@ func GetTestProjectInPath(path string, opts ...Option) (*Project, UnlockFn, erro
 // If no project is available, the function waits until a project is released.
 func (v ProjectsPool) GetTestProjectForTest(t TInterface, opts ...Option) (*Project, error) {
 	// Get project
-	p, unlockFn, err := v.GetTestProject(opts...)
+	p, cancel, err := v.GetTestProject(opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unlock when test is done
 	t.Cleanup(func() {
-		unlockFn()
+		cancel()
 	})
 
 	return p, nil
@@ -219,7 +216,7 @@ func (v ProjectsPool) GetTestProjectForTest(t TInterface, opts ...Option) (*Proj
 // GetTestProject locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // The returned UnlockFn function must be called to free project, when the project is no longer used (e.g. defer unlockFn())
 // If no project is available, the function waits until a project is released.
-func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
+func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, context.CancelFunc, error) {
 	c := &config{}
 	for _, opt := range opts {
 		opt(c)
@@ -234,11 +231,8 @@ func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error)
 		anyProjectFound := false
 		for _, p := range v {
 			if c.IsCompatible(p) {
-				if p.locker.tryLock() {
-					unlockFn := func() {
-						p.locker.unlock()
-					}
-					return p, unlockFn, nil
+				if locked, cancel := p.locker.tryLock(context.Background()); locked {
+					return p, cancel, nil
 				}
 
 				anyProjectFound = true

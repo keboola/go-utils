@@ -1,6 +1,7 @@
 package testproject
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,24 +57,25 @@ func (fl *fsLocker) newForProject(p *Project) projectLocker {
 	}
 }
 
-func (fl *fsProjectLocker) tryLock() bool {
+func (fl *fsProjectLocker) tryLock(ctx context.Context) (bool, context.CancelFunc) {
 	// This FS lock works between processes
 	if locked, err := fl.fsLock.TryLock(); err != nil {
 		panic(fmt.Errorf(`cannot lock test project: %w`, err))
 	} else if !locked {
 		// Busy
-		return false
+		return false, nil
 	}
 
 	// This lock works inside one process, between goroutines
 	if !fl.lock.TryLock() {
 		// Busy
-		return false
+		return false, nil
 	}
 
+	cancel := func() { fl.unlock() }
 	// Locked
 	fl.locked = true
-	return true
+	return true, cancel
 }
 
 // unlock project if it is no more needed in test.
