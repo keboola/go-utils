@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bsm/redislock"
@@ -57,7 +58,9 @@ type redisProjectLocker struct {
 	redisLocker *redisLocker
 	projectID   string
 	redisLock   *redislock.Lock // lock between projects using redis
+	cancel      func()
 	locked      bool
+	mu          sync.Mutex
 }
 
 func (rl *redisLocker) newForProject(p *Project) projectLocker {
@@ -87,9 +90,11 @@ func (rl *redisProjectLocker) tryLock() bool {
 // replace implementation with https://github.com/bsm/redislock/pull/73 in future.
 func (rl *redisProjectLocker) extendLock() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	rl.mu.Lock()
+	rl.cancel = cancel
+	rl.mu.Unlock()
 
-	ticker := time.NewTicker(TTL / 2)
+	ticker := time.NewTicker(TTL / 4)
 	defer ticker.Stop()
 	for {
 		select {
@@ -99,10 +104,6 @@ func (rl *redisProjectLocker) extendLock() {
 		case <-ticker.C:
 			err := rl.redisLock.Refresh(ctx, TTL, nil)
 			if err != nil {
-				if errors.Is(err, redislock.ErrNotObtained) {
-					return
-				}
-
 				panic(fmt.Errorf(`cannot extend the redis lock: %w`, err))
 			}
 		}
@@ -113,6 +114,12 @@ func (rl *redisProjectLocker) unlock() {
 	rl.locked = false
 	if err := rl.redisLock.Release(context.Background()); err != nil {
 		panic(fmt.Errorf(`cannot unlock test project using redis lock: %w`, err))
+	}
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	if rl.cancel != nil {
+		rl.cancel()
 	}
 }
 
