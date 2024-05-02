@@ -132,6 +132,12 @@ func (rl *redisProjectLocker) unlock() {
 	if err := rl.redisLock.Release(context.Background()); err != nil {
 		panic(fmt.Errorf(`cannot unlock test project using redis lock: %w`, err))
 	}
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	if rl.cancel != nil {
+		rl.cancel()
+	}
 }
 
 func (rl *redisProjectLocker) isLocked() bool {
