@@ -117,7 +117,7 @@ func (o *OrderedMap) SetNested(path string, value any) error {
 // SetNestedPath value defined by key, eg. Key{MapStep("parameters), MapStep("foo"), SliceStep(123)}.
 func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 	if len(path) == 0 {
-		panic(fmt.Errorf(`path cannot be empty`))
+		return fmt.Errorf(`path cannot be empty`)
 	}
 
 	currentKey := make(Path, 0)
@@ -155,7 +155,7 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 				return fmt.Errorf(`path "%s": expected array found "%T"`, currentKey.WithoutLast(), current)
 			}
 		default:
-			panic(fmt.Errorf(`unexpected type "%T"`, key))
+			return fmt.Errorf(`unexpected type "%T"`, key)
 		}
 	}
 
@@ -168,7 +168,7 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 		return fmt.Errorf(`path "%s": expected object found "%T"`, currentKey, current)
 	}
 
-	panic(fmt.Errorf(`last key must be MapStep, found "%T"`, lastKey))
+	return fmt.Errorf(`path "%s": last key must be MapStep, found "%T"`, path, lastKey)
 }
 
 // GetNestedOrNil returns nil if values is not found or an error occurred.
@@ -214,7 +214,7 @@ func (o *OrderedMap) GetNested(path string) (value any, found bool, err error) {
 // GetNestedPath returns nested value by Path.
 func (o *OrderedMap) GetNestedPath(path Path) (value any, found bool, err error) {
 	if len(path) == 0 {
-		panic(fmt.Errorf(`path cannot be empty`))
+		return nil, false, fmt.Errorf(`path cannot be empty`)
 	}
 
 	currentKey := make(Path, 0)
@@ -246,7 +246,7 @@ func (o *OrderedMap) GetNestedPath(path Path) (value any, found bool, err error)
 				return nil, true, fmt.Errorf(`path "%s": expected array found "%T"`, currentKey.WithoutLast(), current)
 			}
 		default:
-			panic(fmt.Errorf(`unexpected type "%T"`, key))
+			return nil, false, fmt.Errorf(`unexpected type "%T"`, key)
 		}
 	}
 	return current, true, nil
