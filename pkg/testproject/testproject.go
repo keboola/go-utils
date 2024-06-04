@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +40,7 @@ const (
 
 	BackendSnowflake               = "snowflake"
 	BackendBigQuery                = "bigquery"
-	TestKbcProjectsKey             = "TEST_KBC_PROJECTS"
+	TestKbcProjectsFileKey         = "TEST_KBC_PROJECTS_FILE"
 	TestKbcProjectsLockDirNameKey  = "TEST_KBC_PROJECTS_LOCK_DIR_NAME"
 	TestKbcProjectsLockHostKey     = "TEST_KBC_PROJECTS_LOCK_HOST"
 	TestKbcProjectsLockPasswordKey = "TEST_KBC_PROJECTS_LOCK_PASSWORD"
@@ -195,6 +196,10 @@ func GetTestProject(opts ...Option) (*Project, UnlockFn, error) {
 	return mustGetProjects().GetTestProject(opts...)
 }
 
+func GetTestProjectInPath(path string, opts ...Option) (*Project, UnlockFn, error) {
+	return mustGetProjectsInPath(path).GetTestProject(opts...)
+}
+
 // GetTestProjectForTest locks and returns a testing project specified in TEST_KBC_PROJECTS environment variable.
 // Project lock is automatically released at the end of the test.
 // If no project is available, the function waits until a project is released.
@@ -344,14 +349,23 @@ func GetProjectsFrom(str string) (ProjectsPool, error) {
 }
 
 func mustGetProjects() *ProjectsPool {
-	projects, err := getProjects()
+	projects, err := getProjects("")
 	if err != nil {
 		panic(err)
 	}
 	return projects
 }
 
-func getProjects() (*ProjectsPool, error) {
+func mustGetProjectsInPath(path string) *ProjectsPool {
+	projects, err := getProjects(path)
+	if err != nil {
+		panic(err)
+	}
+	return projects
+}
+
+// getProjects loads projects from provided file by path or environment variable TEST_KBC_PROJECTS_FILE.
+func getProjects(path string) (*ProjectsPool, error) {
 	poolLock.Lock()
 	defer poolLock.Unlock()
 
@@ -360,8 +374,22 @@ func getProjects() (*ProjectsPool, error) {
 		return pool, nil
 	}
 
-	// Init projects from the ENV
-	if v, err := GetProjectsFrom(os.Getenv(TestKbcProjectsKey)); err == nil { // nolint: forbidigo
+	projectsFile := path
+	if projectsFile == "" {
+		projectsFile = os.Getenv(TestKbcProjectsFileKey) // nolint: forbidigo
+	}
+
+	if !filepath.IsAbs(projectsFile) {
+		return nil, fmt.Errorf("the projects file should be absolute, not relative, got %s", projectsFile)
+	}
+
+	// Init projects from the json projects file
+	projects, err := os.ReadFile(projectsFile) // nolint: forbidigo
+	if err != nil {
+		return nil, fmt.Errorf("error occurred during project pool setup: %w", err)
+	}
+
+	if v, err := GetProjectsFrom(string(projects)); err == nil {
 		pool = &v // initialization run only once
 		return pool, nil
 	} else {
