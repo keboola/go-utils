@@ -377,10 +377,13 @@ func getProjects(path string) (*ProjectsPool, error) {
 	projectsFile := path
 	if projectsFile == "" {
 		projectsFile = os.Getenv(TestKbcProjectsFileKey) // nolint: forbidigo
+		if projectsFile == "" {
+			return nil, fmt.Errorf("please set TEST_KBC_PROJECTS_FILE environment variable")
+		}
 	}
 
 	if !filepath.IsAbs(projectsFile) {
-		return nil, fmt.Errorf("the projects file should be absolute, not relative, got %s", projectsFile)
+		return nil, fmt.Errorf("the path to projects.json file should be absolute, not relative, got %s", projectsFile)
 	}
 
 	// Init projects from the json projects file
