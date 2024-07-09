@@ -14,7 +14,7 @@ ENV EDITOR=nano
 RUN mkdir -p /tmp/build
 COPY Makefile /tmp/build/Makefile
 COPY scripts  /tmp/build/scripts
-RUN cd /tmp/build && make install-tools && rm -rf /tmp/build
+RUN cd /tmp/build && make tools && rm -rf /tmp/build
 
 # Set prompt
 RUN mkdir -p ~ && \
