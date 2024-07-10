@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	TTL = 60 * time.Second
+	TTL = 2 * time.Minute
 )
 
 // redisLocker is factory constructing redisProjectLockers.
@@ -71,9 +71,7 @@ func (rl *redisLocker) newForProject(p *Project) projectLocker {
 }
 
 func (rl *redisProjectLocker) tryLock() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	lock, err := rl.redisLocker.locker.Obtain(ctx, rl.projectID, TTL, nil)
+	lock, err := rl.redisLocker.locker.Obtain(context.Background(), rl.projectID, TTL, nil)
 	if errors.Is(err, redislock.ErrNotObtained) {
 		return false
 	} else if err != nil {
