@@ -265,19 +265,19 @@ func TestOrderedMapGetNested(t *testing.T) {
 	assert.Nil(t, value)
 
 	// Missing nested slice key
-	value, found, err = root.GetNested(`nested.slice[123]`)
+	value, found, err = root.GetNested(`nested.slice[3]`)
 	assert.Nil(t, value)
 	assert.False(t, found)
 	assert.Error(t, err)
-	assert.Equal(t, `path "nested.slice[123]" not found`, err.Error())
-	value = root.GetNestedOrNil(`nested.slice[123]`)
+	assert.Equal(t, `path "nested.slice[3]" not found`, err.Error())
+	value = root.GetNestedOrNil(`nested.slice[3]`)
 	assert.Nil(t, value)
-	value, found, err = root.GetNestedPath(Path{MapStep(`nested`), MapStep(`slice`), SliceStep(123)})
+	value, found, err = root.GetNestedPath(Path{MapStep(`nested`), MapStep(`slice`), SliceStep(3)})
 	assert.Nil(t, value)
 	assert.False(t, found)
 	assert.Error(t, err)
-	assert.Equal(t, `path "nested.slice[123]" not found`, err.Error())
-	value = root.GetNestedPathOrNil(Path{MapStep(`nested`), MapStep(`slice`), SliceStep(123)})
+	assert.Equal(t, `path "nested.slice[3]" not found`, err.Error())
+	value = root.GetNestedPathOrNil(Path{MapStep(`nested`), MapStep(`slice`), SliceStep(3)})
 	assert.Nil(t, value)
 
 	// Get nested map - not found
@@ -330,9 +330,19 @@ func TestOrderedMapSetNested(t *testing.T) {
 	assert.NoError(t, root.SetNested(`nested.missing.key`, `value`))
 	assert.NoError(t, root.SetNestedPath(Path{MapStep(`nested`), MapStep(`missing`), MapStep(`key`)}, `value`))
 
+	// Set nested in slice
+	assert.NoError(t, root.SetNested(`slice`, []any{New()}))
+	assert.NoError(t, root.SetNested(`slice[0].foo`, 4))
+	assert.NoError(t, root.SetNestedPath(Path{MapStep(`slice`), SliceStep(0), MapStep(`foo`)}, 4))
+
+	// Set nested in slice - invalid key
+	err := root.SetNested(`slice[1].foo`, 4)
+	assert.Error(t, err)
+	assert.Equal(t, `path "slice[1]" not found`, err.Error())
+
 	// Set nested - invalid type
 	assert.NoError(t, root.SetNested(`str`, `value`))
-	err := root.SetNested(`str.key`, `value`)
+	err = root.SetNested(`str.key`, `value`)
 	assert.Error(t, err)
 	assert.Equal(t, `path "str": expected object found "string"`, err.Error())
 	err = root.SetNestedPath(Path{MapStep(`str`), MapStep(`key`)}, `value`)
@@ -350,6 +360,11 @@ func TestOrderedMapSetNested(t *testing.T) {
       "key": "value"
     }
   },
+  "slice": [
+    {
+      "foo": 4
+    }
+  ],
   "str": "value"
 }
 `

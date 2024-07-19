@@ -145,7 +145,7 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 			}
 		case SliceStep:
 			if s, ok := current.([]any); ok {
-				if len(s) >= int(key) {
+				if len(s) > int(key) {
 					current = s[key]
 					continue
 				} else {
@@ -236,7 +236,7 @@ func (o *OrderedMap) GetNestedPath(path Path) (value any, found bool, err error)
 			}
 		case SliceStep:
 			if s, ok := current.([]any); ok {
-				if len(s) >= int(key) {
+				if len(s) > int(key) {
 					current = s[key]
 					continue
 				} else {
