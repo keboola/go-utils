@@ -114,7 +114,7 @@ func (o *OrderedMap) SetNested(path string, value any) error {
 	return o.SetNestedPath(PathFromStr(path), value)
 }
 
-// SetNestedPath value defined by key, eg. Key{MapStep("parameters), MapStep("foo"), SliceStep(123)}.
+// SetNestedPath value defined by key, eg. Key{MapStep("parameters"), MapStep("foo"), SliceStep(123)}.
 func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 	if len(path) == 0 {
 		return fmt.Errorf(`path cannot be empty`)
@@ -126,8 +126,24 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 	parentKeys := path.WithoutLast()
 	lastKey := path.Last()
 
+	// Creates new Map or Slice based on the next step
+	newValueFactory := func(i int) any {
+		var nextKey Step
+		if i+1 < len(parentKeys) {
+			nextKey = parentKeys[i+1]
+		} else {
+			nextKey = lastKey
+		}
+
+		if _, ok := nextKey.(SliceStep); ok {
+			return []any{}
+		}
+
+		return New()
+	}
+
 	// Get nested map
-	for _, key := range parentKeys {
+	for i, key := range parentKeys {
 		currentKey = append(currentKey, key)
 		switch key := key.(type) {
 		case MapStep:
@@ -136,28 +152,43 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 					current = v
 					continue
 				} else {
-					newMap := New()
-					current = newMap
-					m.Set(string(key), newMap)
+					current = newValueFactory(i)
+					m.Set(string(key), current)
 				}
 			} else {
 				return fmt.Errorf(`path "%s": expected object found "%T"`, currentKey, current)
 			}
 		case SliceStep:
+			if i == 0 {
+				return fmt.Errorf(`first key must be MapStep, found "%T"`, key)
+			}
 			if s, ok := current.([]any); ok {
-				if len(s) > int(key) {
+				if int(key) < 0 {
+					return fmt.Errorf(`path "%s": array key can't be negative`, currentKey)
+				} else if len(s) > int(key) {
 					current = s[key]
 					continue
 				} else {
-					return fmt.Errorf(`path "%s" not found`, currentKey)
+					// Add nil values if the new key isn't immediately after the last
+					for key.Index() > len(s) {
+						s = append(s, nil)
+					}
+
+					current = newValueFactory(i)
+					err := o.SetNestedPath(currentKey.WithoutLast(), append(s, current))
+					if err != nil {
+						return err
+					}
 				}
 			} else {
-				return fmt.Errorf(`path "%s": expected array found "%T"`, currentKey.WithoutLast(), current)
+				return fmt.Errorf(`path "%s": expected array found "%T"`, currentKey, current)
 			}
 		default:
 			return fmt.Errorf(`unexpected type "%T"`, key)
 		}
 	}
+
+	currentKey = append(currentKey, lastKey)
 
 	// Set value to map
 	if key, ok := lastKey.(MapStep); ok {
@@ -168,7 +199,27 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 		return fmt.Errorf(`path "%s": expected object found "%T"`, currentKey, current)
 	}
 
-	return fmt.Errorf(`path "%s": last key must be MapStep, found "%T"`, path, lastKey)
+	// Set value to slice
+	if key, ok := lastKey.(SliceStep); ok {
+		if s, ok := current.([]any); ok {
+			if int(key) < 0 {
+				return fmt.Errorf(`path "%s": array key can't be negative`, currentKey)
+			} else if int(key) < len(s) {
+				s[key] = value
+				return nil
+			} else {
+				// Add nil values if the new key isn't immediately after the last
+				for key.Index() > len(s) {
+					s = append(s, nil)
+				}
+
+				return o.SetNestedPath(currentKey.WithoutLast(), append(s, value))
+			}
+		}
+		return fmt.Errorf(`path "%s": expected array found "%T"`, currentKey, current)
+	}
+
+	return fmt.Errorf(`path "%s": last key must be MapStep of SliceStep, found "%T"`, path, lastKey)
 }
 
 // GetNestedOrNil returns nil if values is not found or an error occurred.
