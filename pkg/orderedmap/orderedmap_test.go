@@ -335,19 +335,67 @@ func TestOrderedMapSetNested(t *testing.T) {
 	assert.NoError(t, root.SetNested(`slice[0].foo`, 4))
 	assert.NoError(t, root.SetNestedPath(Path{MapStep(`slice`), SliceStep(0), MapStep(`foo`)}, 4))
 
-	// Set nested in slice - invalid key
-	err := root.SetNested(`slice[1].foo`, 4)
-	assert.Error(t, err)
-	assert.Equal(t, `path "slice[1]" not found`, err.Error())
+	// Set slice value
+	assert.NoError(t, root.SetNestedPath(Path{MapStep(`slice2`), SliceStep(0)}, 4))
+	assert.NoError(t, root.SetNestedPath(Path{MapStep(`slice2`), SliceStep(1)}, 5))
+	assert.NoError(t, root.SetNestedPath(Path{MapStep(`slice2`), SliceStep(5)}, 6))
+
+	// Set value in nested slices
+	assert.NoError(t, root.SetNestedPath(Path{MapStep(`slice3`), SliceStep(1), SliceStep(1), SliceStep(1)}, 7))
+
+	// Set nested in slice
+	assert.NoError(t, root.SetNested(`slice[2].foo[1]`, 5))
 
 	// Set nested - invalid type
 	assert.NoError(t, root.SetNested(`str`, `value`))
-	err = root.SetNested(`str.key`, `value`)
+	err := root.SetNested(`str.key`, `value`)
 	assert.Error(t, err)
-	assert.Equal(t, `path "str": expected object found "string"`, err.Error())
+	assert.Equal(t, `path "str.key": expected object found "string"`, err.Error())
 	err = root.SetNestedPath(Path{MapStep(`str`), MapStep(`key`)}, `value`)
 	assert.Error(t, err)
-	assert.Equal(t, `path "str": expected object found "string"`, err.Error())
+	assert.Equal(t, `path "str.key": expected object found "string"`, err.Error())
+
+	// Invalid: first step is SliceStep
+	err = root.SetNestedPath(Path{SliceStep(0), SliceStep(1)}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `first key must be MapStep, found "orderedmap.SliceStep"`, err.Error())
+
+	// Invalid: negative slice step
+	err = root.SetNestedPath(Path{MapStep("test"), SliceStep(-1)}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path "test[-1]": array key can't be negative`, err.Error())
+	err = root.SetNestedPath(Path{MapStep("test"), SliceStep(-1), MapStep("test")}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path "test[-1]": array key can't be negative`, err.Error())
+
+	// Invalid: unknown step type
+	err = root.SetNestedPath(Path{MapStep("test"), MapKeyStep("test")}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path "test[test].<key>": last key must be MapStep of SliceStep, found "orderedmap.MapKeyStep"`, err.Error())
+	err = root.SetNestedPath(Path{MapStep("test"), MapKeyStep("test"), MapStep("test")}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `unexpected type "orderedmap.MapKeyStep"`, err.Error())
+
+	// Invalid: empty path
+	err = root.SetNestedPath(Path{}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path cannot be empty`, err.Error())
+
+	// Invalid: using MapStep on slice
+	err = root.SetNestedPath(Path{MapStep(`slice`), MapStep(`test`), SliceStep(1)}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path "slice.test": expected object found "[]interface {}"`, err.Error())
+	err = root.SetNestedPath(Path{MapStep(`slice`), MapStep(`test`)}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path "slice.test": expected object found "[]interface {}"`, err.Error())
+
+	// Invalid: using SliceStep on map
+	err = root.SetNestedPath(Path{MapStep(`nested`), SliceStep(0), SliceStep(1)}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path "nested[0]": expected array found "*orderedmap.OrderedMap"`, err.Error())
+	err = root.SetNestedPath(Path{MapStep(`nested`), SliceStep(0)}, 1)
+	assert.Error(t, err)
+	assert.Equal(t, `path "nested[0]": expected array found "*orderedmap.OrderedMap"`, err.Error())
 
 	expected := `
 {
@@ -363,9 +411,35 @@ func TestOrderedMapSetNested(t *testing.T) {
   "slice": [
     {
       "foo": 4
+    },
+    null,
+    {
+      "foo": [
+        null,
+        5
+      ]
     }
   ],
-  "str": "value"
+  "slice2": [
+    4,
+    5,
+    null,
+    null,
+    null,
+    6
+  ],
+  "slice3": [
+    null,
+    [
+      null,
+      [
+        null,
+        7
+      ]
+    ]
+  ],
+  "str": "value",
+  "test": []
 }
 `
 	jsonBytes, err := json.MarshalIndent(root, "", "  ")
