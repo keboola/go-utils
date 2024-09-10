@@ -170,9 +170,7 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 					continue
 				} else {
 					// Add nil values if the new key isn't immediately after the last
-					for key.Index() > len(s) {
-						s = append(s, nil)
-					}
+					s = append(s, make([]any, key.Index()-len(s))...)
 
 					current = newValueFactory(i)
 					err := o.SetNestedPath(currentKey.WithoutLast(), append(s, current))
@@ -209,9 +207,7 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 				return nil
 			} else {
 				// Add nil values if the new key isn't immediately after the last
-				for key.Index() > len(s) {
-					s = append(s, nil)
-				}
+				s = append(s, make([]any, key.Index()-len(s))...)
 
 				return o.SetNestedPath(currentKey.WithoutLast(), append(s, value))
 			}
