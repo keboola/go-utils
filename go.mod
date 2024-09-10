@@ -1,6 +1,6 @@
 module github.com/keboola/go-utils
 
-go 1.19
+go 1.22
 
 require (
 	github.com/bsm/redislock v0.9.4
