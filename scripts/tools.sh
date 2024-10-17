@@ -10,9 +10,9 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "$SCRIPT_DIR"
 
 ./install-gotestsum.sh -b $(go env GOPATH)/bin
-# golangci-lint                                                                                                                    
+# golangci-lint
 if ! command -v golangci-lint &> /dev/null
 then
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.57.2                               
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
 fi
 go install golang.org/x/tools/cmd/godoc@latest
