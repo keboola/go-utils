@@ -248,7 +248,7 @@ func (v ProjectsPool) GetTestProject(opts ...Option) (*Project, UnlockFn, error)
 		}
 
 		if !anyProjectFound {
-			return nil, nil, fmt.Errorf(fmt.Sprintf(`no compatible test project found %s`, c.String()))
+			return nil, nil, fmt.Errorf(`no compatible test project found %s`, c.String())
 		}
 
 		// No free project -> wait
