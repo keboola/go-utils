@@ -166,7 +166,7 @@ func (c *config) IsCompatible(p *Project) bool {
 
 	matchLegacyTransformation := !c.legacyTransformation || p.definition.LegacyTransformation == c.legacyTransformation
 
-	matchIsGuest := !c.isGuest || p.definition.IsGuest == c.isGuest
+	matchIsGuest := p.definition.IsGuest == c.isGuest
 
 	return matchStagingStorage && matchQueue && matchBackend && matchLegacyTransformation && matchIsGuest
 }
