@@ -80,6 +80,7 @@ type Definition struct {
 	ProjectID            int    `json:"project" validate:"required"`
 	LegacyTransformation bool   `json:"legacyTransformation"`
 	Queue                string `json:"queue,omitempty"`
+	IsGuest              bool   `json:"isGuest,omitempty"`
 }
 
 // UnlockFn must be called if the project is no longer used.
@@ -94,6 +95,7 @@ type config struct {
 	stagingStorage       string
 	legacyTransformation bool
 	queueV1              bool
+	isGuest              bool
 }
 
 // TInterface is cleanup part of the *testing.T.
@@ -149,6 +151,12 @@ func WithLegacyTransformation() Option {
 	}
 }
 
+func WithIsGuest() Option {
+	return func(c *config) {
+		c.isGuest = true
+	}
+}
+
 func (c *config) IsCompatible(p *Project) bool {
 	matchStagingStorage := len(c.stagingStorage) == 0 || p.definition.StagingStorage == c.stagingStorage
 
@@ -158,7 +166,9 @@ func (c *config) IsCompatible(p *Project) bool {
 
 	matchLegacyTransformation := !c.legacyTransformation || p.definition.LegacyTransformation == c.legacyTransformation
 
-	return matchStagingStorage && matchQueue && matchBackend && matchLegacyTransformation
+	matchIsGuest := p.definition.IsGuest == c.isGuest
+
+	return matchStagingStorage && matchQueue && matchBackend && matchLegacyTransformation && matchIsGuest
 }
 
 func (c *config) String() string {
@@ -177,6 +187,10 @@ func (c *config) String() string {
 
 	if c.legacyTransformation {
 		out = append(out, fmt.Sprintf("legacy transformation %v", c.legacyTransformation))
+	}
+
+	if c.isGuest {
+		out = append(out, "guest project")
 	}
 
 	return "(" + strings.Join(out, ", ") + ")"
@@ -290,6 +304,12 @@ func (p *Project) Backend() string {
 func (p *Project) LegacyTransformation() bool {
 	p.assertLocked()
 	return p.definition.LegacyTransformation
+}
+
+// IsGuest returns that the project is tested as guest user.
+func (p *Project) IsGuest() bool {
+	p.assertLocked()
+	return p.definition.IsGuest
 }
 
 func (p *Project) assertLocked() {
