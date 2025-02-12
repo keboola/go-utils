@@ -168,43 +168,12 @@ func TestGetTestProject_WithBigQueryBackend(t *testing.T) {
 	assert.Equal(t, 1234, project1.ID())
 }
 
-func TestGetTestProject_WithQueueV1(t *testing.T) {
-	t.Parallel()
-	project1, unlockFn1, _ := MustGetProjectsFrom(projectsForTest()).GetTestProject(WithQueueV1())
-	defer unlockFn1()
-	assert.Equal(t, 7890, project1.ID())
-}
-
 func TestGetTestProject_NoProjectForStagingStorage(t *testing.T) {
 	t.Parallel()
 	projects, err := GetProjectsFrom(`[{"project": 5678,"backend":"bigquery", "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3"}]`)
 	assert.NoError(t, err)
 	_, _, err = projects.GetTestProject(WithStagingStorage("gcs"))
 	assert.ErrorContains(t, err, `no compatible test project found (staging storage gcs)`)
-}
-
-func TestGetTestProject_NoProjectWithQueueV1(t *testing.T) {
-	t.Parallel()
-	projects, err := GetProjectsFrom(`[{"project": 5678,"backend":"bigquery", "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3"}]`)
-	assert.NoError(t, err)
-	_, _, err = projects.GetTestProject(WithQueueV1())
-	assert.ErrorContains(t, err, `no compatible test project found (queue v1)`)
-}
-
-func TestGetTestProject_NoProjectWithoutQueueV1(t *testing.T) {
-	t.Parallel()
-	projects, err := GetProjectsFrom(`[{"project": 5678,"backend":"bigquery", "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3", "queue": "v1"}]`)
-	assert.NoError(t, err)
-	_, _, err = projects.GetTestProject()
-	assert.ErrorContains(t, err, `no compatible test project found`)
-}
-
-func TestGetTestProject_NoProjectWithStagingStorageABSAndQueueV1(t *testing.T) {
-	t.Parallel()
-	projects, err := GetProjectsFrom(`[{"project": 5678,"backend":"bigquery", "host": "foo.keboola.com", "token": "bar", "stagingStorage": "s3"}]`)
-	assert.NoError(t, err)
-	_, _, err = projects.GetTestProject(WithStagingStorageABS(), WithQueueV1())
-	assert.ErrorContains(t, err, `no compatible test project found (staging storage abs, queue v1)`)
 }
 
 func TestGetProjectsFrom_EmptyString(t *testing.T) {
@@ -247,14 +216,6 @@ func projectsForTest() string {
 			Backend:        BackendBigQuery,
 			StagingStorage: StagingStorageS3,
 			ProjectID:      5678,
-		},
-		{
-			Host:           "connection.keboola.com",
-			Token:          "7890-abcdef",
-			Backend:        BackendSnowflake,
-			StagingStorage: StagingStorageS3,
-			ProjectID:      7890,
-			Queue:          "v1",
 		},
 	}
 	j, err := json.Marshal(projects)
