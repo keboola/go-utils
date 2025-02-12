@@ -47,8 +47,6 @@ const (
 	TestKbcProjectsLockTLSKey      = "TEST_KBC_PROJECTS_LOCK_TLS"
 )
 
-const QueueV1 = "v1"
-
 var pool *ProjectsPool       // nolint gochecknoglobals
 var poolLock = &sync.Mutex{} // nolint gochecknoglobals
 
@@ -79,7 +77,6 @@ type Definition struct {
 	Backend              string `json:"backend" validate:"required"`
 	ProjectID            int    `json:"project" validate:"required"`
 	LegacyTransformation bool   `json:"legacyTransformation"`
-	Queue                string `json:"queue,omitempty"`
 	IsGuest              bool   `json:"isGuest,omitempty"`
 }
 
@@ -94,7 +91,6 @@ type config struct {
 	backend              string
 	stagingStorage       string
 	legacyTransformation bool
-	queueV1              bool
 	isGuest              bool
 }
 
@@ -127,12 +123,6 @@ func WithStagingStorage(stagingStorage string) Option {
 	}
 }
 
-func WithQueueV1() Option {
-	return func(c *config) {
-		c.queueV1 = true
-	}
-}
-
 func WithSnowflakeBackend() Option {
 	return func(c *config) {
 		c.backend = BackendSnowflake
@@ -160,25 +150,19 @@ func WithIsGuest() Option {
 func (c *config) IsCompatible(p *Project) bool {
 	matchStagingStorage := len(c.stagingStorage) == 0 || p.definition.StagingStorage == c.stagingStorage
 
-	matchQueue := (p.definition.Queue == QueueV1) == c.queueV1 // QueueV2 is required, if QueueV1 is not explicitly requested
-
 	matchBackend := len(c.backend) == 0 || p.definition.Backend == c.backend
 
 	matchLegacyTransformation := !c.legacyTransformation || p.definition.LegacyTransformation == c.legacyTransformation
 
 	matchIsGuest := p.definition.IsGuest == c.isGuest
 
-	return matchStagingStorage && matchQueue && matchBackend && matchLegacyTransformation && matchIsGuest
+	return matchStagingStorage && matchBackend && matchLegacyTransformation && matchIsGuest
 }
 
 func (c *config) String() string {
 	out := []string{}
 	if len(c.stagingStorage) > 0 {
 		out = append(out, fmt.Sprintf("staging storage %s", c.stagingStorage))
-	}
-
-	if c.queueV1 {
-		out = append(out, "queue v1")
 	}
 
 	if len(c.backend) > 0 {
