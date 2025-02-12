@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // DeepEqualNotSame checks that a and b values are deep equally, but do not contain any pointer to same value.
@@ -14,7 +15,7 @@ func DeepEqualNotSame(t *testing.T, a, b any, path string) {
 	t.Helper()
 
 	// Equal
-	assert.Equal(t, a, b, path)
+	require.Equal(t, a, b, path)
 
 	// Both nil
 	if a == nil || b == nil {
@@ -27,11 +28,15 @@ func DeepEqualNotSame(t *testing.T, a, b any, path string) {
 	typeA := reflect.TypeOf(a)
 	typeB := reflect.TypeOf(b)
 	if typeA.String() != typeB.String() {
-		assert.FailNowf(t, `different types`, `A (%s) and B (%s) have different types`, typeA.String(), typeB.String())
+		require.FailNowf(t, `different types`, `A (%s) and B (%s) have different types`, typeA.String(), typeB.String())
 	}
 
 	// But not same (points to different values)
-	assert.NotSamef(t, a, b, `%s, path: %s`, typeA.String(), path)
+	if typeA.Kind() == reflect.Interface && typeB.Kind() == reflect.Interface {
+		require.NotSamef(t, a, b, `%s, path: %s`, typeA.String(), path)
+	} else {
+		assert.Equal(t, a, b, `%s, path: %s`, typeA.String(), path)
+	}
 
 	// Nested fields
 	valueA := reflect.ValueOf(a)
