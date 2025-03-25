@@ -122,7 +122,7 @@ func translateRecursive(clone, original reflect.Value, callback TranslateFn, pat
 	// If it is a struct we translate each field
 	case kind == reflect.Struct:
 		t := originalType
-		for i := 0; i < original.NumField(); i++ {
+		for i := range original.NumField() {
 			path := path.Add(StructFieldStep{CurrentType: originalType, Field: t.Field(i).Name})
 			cloneField := clone.Field(i)
 			if !cloneField.CanSet() {
@@ -135,7 +135,7 @@ func translateRecursive(clone, original reflect.Value, callback TranslateFn, pat
 	case kind == reflect.Slice:
 		if !original.IsNil() {
 			clone.Set(reflect.MakeSlice(originalType, original.Len(), original.Cap()))
-			for i := 0; i < original.Len(); i++ {
+			for i := range original.Len() {
 				path := path.Add(SliceIndexStep{Index: i})
 				translateRecursive(clone.Index(i), original.Index(i), callback, path, visitedPtr)
 			}
