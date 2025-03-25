@@ -13,6 +13,6 @@ cd "$SCRIPT_DIR"
 # golangci-lint
 if ! command -v golangci-lint &> /dev/null
 then
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.7
 fi
 go install golang.org/x/tools/cmd/godoc@latest
