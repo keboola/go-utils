@@ -9,7 +9,6 @@ package orderedmap
 import (
 	"fmt"
 	"reflect"
-	"slices"
 	"sort"
 
 	"github.com/keboola/go-utils/pkg/deepcopy"
@@ -314,7 +313,7 @@ func (o *OrderedMap) Delete(key string) {
 	// remove from keys
 	for i, k := range o.keys {
 		if k == key {
-			o.keys = slices.Delete(o.keys, i, i+1)
+			o.keys = append(o.keys[:i], o.keys[i+1:]...)
 			break
 		}
 	}
