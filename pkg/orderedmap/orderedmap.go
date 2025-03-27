@@ -313,7 +313,10 @@ func (o *OrderedMap) Delete(key string) {
 	// remove from keys
 	for i, k := range o.keys {
 		if k == key {
+			//o.keys = slices.Delete(o.keys, i, i+1)
+			oldlen := len(o.keys)
 			o.keys = append(o.keys[:i], o.keys[i+1:]...)
+			clear(o.keys[len(o.keys):oldlen])
 			break
 		}
 	}
