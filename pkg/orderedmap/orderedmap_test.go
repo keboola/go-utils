@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOrderedMap(t *testing.T) {
@@ -534,4 +535,22 @@ path=str, parent=*orderedmap.OrderedMap, value=string
 		visited = append(visited, fmt.Sprintf(`path=%s, parent=%T, value=%T`, path, parent, value))
 	})
 	assert.Equal(t, strings.TrimSpace(expected), strings.Join(visited, "\n"))
+}
+
+func TestOrderedMap_DeleteFunc(t *testing.T) {
+	t.Parallel()
+	o := New()
+
+	o.Set("a", true)
+	o.DeleteFunc(func(key string) bool {
+		return strings.HasPrefix("a/b", key+"/")
+	})
+	o.Set("a/c", true)
+	o.Set("a/c/d", true)
+	o.Set("a/c/d/e", true)
+	o.DeleteFunc(func(key string) bool {
+		return strings.HasPrefix("a/c/d/e/f", key+"/")
+	})
+
+	require.Len(t, o.Keys(), 0)
 }
