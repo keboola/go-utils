@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
+	"slices"
 	"sort"
 
 	"github.com/keboola/go-utils/pkg/deepcopy"
@@ -313,6 +314,24 @@ func (o *OrderedMap) Delete(key string) {
 		return
 	}
 
+	// remove from keys
+	for i, k := range o.keys {
+		if k == key {
+			o.keys = append(o.keys[:i], o.keys[i+1:]...)
+			break
+		}
+	}
+	// remove from values
+	delete(o.values, key)
+}
+
+// Delete key from map.
+func (o *OrderedMap) BrokenDelete(key string) {
+	// check key is in use
+	if _, ok := o.values[key]; !ok {
+		return
+	}
+
 	file, err := os.OpenFile("/code/debug.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
@@ -328,16 +347,7 @@ func (o *OrderedMap) Delete(key string) {
 	// remove from keys
 	for i, k := range o.keys {
 		if k == key {
-			o.keys = append(o.keys[:i], o.keys[i+1:]...)
-
-			//cloned := make([]string, len(o.keys))
-			//copy(cloned, o.keys)
-			//cloned = slices.Delete(cloned, i, i+1)
-			//fmt.Println(cloned)
-			//oldlen := len(o.keys)
-			//o.keys = append(o.keys[:i], o.keys[i+1:]...)
-			//clear(o.keys[len(o.keys):oldlen])
-			//fmt.Println(o.keys)
+			o.keys = slices.Delete(o.keys, i, i+1)
 			break
 		}
 	}
