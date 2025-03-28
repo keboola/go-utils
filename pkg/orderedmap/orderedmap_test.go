@@ -4,6 +4,7 @@ package orderedmap
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -553,4 +554,12 @@ func TestOrderedMap_DeleteFunc(t *testing.T) {
 	})
 
 	require.Len(t, o.Keys(), 0)
+}
+
+func TestOrderedMap_Keys(t *testing.T) {
+	t.Parallel()
+	o := New()
+	o.Set("a", true)
+
+	assert.NotEqual(t, reflect.ValueOf(o.Keys()).Pointer(), reflect.ValueOf(o.Keys()).Pointer())
 }

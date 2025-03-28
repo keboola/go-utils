@@ -323,14 +323,10 @@ func (o *OrderedMap) Delete(key string) {
 }
 
 func (o *OrderedMap) DeleteFunc(fn func(key string) bool) {
-	toDelete := []string{}
-	for _, key := range o.keys {
+	for _, key := range o.Keys() {
 		if fn(key) {
-			toDelete = append(toDelete, key)
+			o.Delete(key)
 		}
-	}
-	for _, key := range toDelete {
-		o.Delete(key)
 	}
 }
 
@@ -341,7 +337,9 @@ func (o *OrderedMap) Len() int {
 
 // Keys method returns all keys as slice.
 func (o *OrderedMap) Keys() []string {
-	return o.keys
+	keys := make([]string, len(o.keys))
+	copy(keys, o.keys)
+	return keys
 }
 
 // SortKeys sorts keys using sort func.
