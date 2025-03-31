@@ -1,13 +1,12 @@
 module github.com/keboola/go-utils
 
 go 1.24.1
-
 require (
 	github.com/bsm/redislock v0.9.4
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
-	github.com/go-playground/validator/v10 v10.25.0
+	github.com/go-playground/validator/v10 v10.26.0
 	github.com/gofrs/flock v0.12.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/redis/go-redis/v9 v9.7.3
