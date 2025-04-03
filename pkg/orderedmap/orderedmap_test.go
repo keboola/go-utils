@@ -1,4 +1,3 @@
-// nolint: ifshort
 package orderedmap
 
 import (
@@ -543,14 +542,13 @@ func TestOrderedMap_DeleteFunc(t *testing.T) {
 
 	o.Set("a", true)
 	o.DeleteFunc(func(key string) bool {
-		return strings.HasPrefix("a/b", key+"/")
+		return strings.HasPrefix("a/b", key+"/") //nolint:gocritic
 	})
 	o.Set("a/c", true)
 	o.Set("a/c/d", true)
 	o.Set("a/c/d/e", true)
 	o.DeleteFunc(func(key string) bool {
-		return strings.HasPrefix("a/c/d/e/f", key+"/")
+		return strings.HasPrefix("a/c/d/e/f", key+"/") //nolint:gocritic
 	})
-
 	require.Len(t, o.Keys(), 0)
 }

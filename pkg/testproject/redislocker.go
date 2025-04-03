@@ -42,7 +42,9 @@ func newRedisLocker(redisHost, redisPassword string) (*redisLocker, error) {
 	client = redis.NewClient(opts)
 	result := client.Ping(context.Background())
 	if result.Err() != nil {
-		client.Close()
+		if err := client.Close(); err != nil {
+			return nil, fmt.Errorf("failed to close Redis client: %w (after ping error: %w)", err, result.Err())
+		}
 		return nil, result.Err()
 	}
 

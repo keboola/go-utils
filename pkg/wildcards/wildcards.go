@@ -54,7 +54,9 @@ func Compare(expected string, actual string) error {
 		diffStr = cleanDiffOutput(diffStr)
 		r := regexp.MustCompile("^" + expectedRegexp + "$")
 		if !r.MatchString(actual) {
-			return fmt.Errorf("Diff:\n-----\n%s-----\nActual:\n-----\n%s\n-----\nExpected:\n-----\n%v\n-----\n", diffStr, actual, expected) //lint:ignore ST1005 We want to end with a newline
+			// This uses uppercase first letter and newlines intentionally for better error readability
+			// nolint:staticcheck // ST1005: Error strings should not be capitalized or end with punctuation
+			return fmt.Errorf("Diff:\n-----\n%s-----\nActual:\n-----\n%s\n-----\nExpected:\n-----\n%v\n-----\n", diffStr, actual, expected)
 		}
 	}
 	return nil

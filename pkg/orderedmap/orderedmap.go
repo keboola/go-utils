@@ -164,12 +164,13 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 				return fmt.Errorf(`first key must be MapStep, found "%T"`, key)
 			}
 			if s, ok := current.([]any); ok {
-				if int(key) < 0 {
+				switch {
+				case int(key) < 0:
 					return fmt.Errorf(`path "%s": array key can't be negative`, currentKey)
-				} else if len(s) > int(key) {
+				case len(s) > int(key):
 					current = s[key]
 					continue
-				} else {
+				default:
 					// Add nil values if the new key isn't immediately after the last
 					s = append(s, make([]any, key.Index()-len(s))...)
 
@@ -201,12 +202,13 @@ func (o *OrderedMap) SetNestedPath(path Path, value any) error {
 	// Set value to slice
 	if key, ok := lastKey.(SliceStep); ok {
 		if s, ok := current.([]any); ok {
-			if int(key) < 0 {
+			switch {
+			case int(key) < 0:
 				return fmt.Errorf(`path "%s": array key can't be negative`, currentKey)
-			} else if int(key) < len(s) {
+			case int(key) < len(s):
 				s[key] = value
 				return nil
-			} else {
+			default:
 				// Add nil values if the new key isn't immediately after the last
 				s = append(s, make([]any, key.Index()-len(s))...)
 

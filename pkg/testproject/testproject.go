@@ -391,7 +391,7 @@ func getProjects(path string) (*ProjectsPool, error) {
 	}
 
 	// Init projects from the json projects file
-	projects, err := os.ReadFile(projectsFile) // nolint: forbidigo
+	projects, err := os.ReadFile(projectsFile) // nolint: forbidigo,gosec // G304: This is intentional file inclusion for test projects
 	if err != nil {
 		return nil, fmt.Errorf("error occurred during project pool setup: %w", err)
 	}
