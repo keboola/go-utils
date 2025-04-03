@@ -56,8 +56,8 @@ func DeepEqualNotSame(t *testing.T, a, b any, path string) {
 				continue
 			} else if !fieldA.CanInterface() {
 				// Read unexported fields
-				fieldA = reflect.NewAt(field.Type, unsafe.Pointer(fieldA.UnsafeAddr())).Elem()
-				fieldB = reflect.NewAt(field.Type, unsafe.Pointer(fieldB.UnsafeAddr())).Elem()
+				fieldA = reflect.NewAt(field.Type, unsafe.Pointer(fieldA.UnsafeAddr())).Elem() // nolint:gosec // G103: Using unsafe is necessary for testing unexported fields
+				fieldB = reflect.NewAt(field.Type, unsafe.Pointer(fieldB.UnsafeAddr())).Elem() // nolint:gosec // G103: Using unsafe is necessary for testing unexported fields
 			}
 
 			DeepEqualNotSame(

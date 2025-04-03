@@ -99,12 +99,12 @@ func ExampleGetTestProject_second() {
 	// to get a testing project from the "TEST_KBC_PROJECTS" environment variable.
 	// Provide also "TEST_KBC_PROJECTS_LOCK_HOST" and "TEST_KBC_PROJECTS_LOCK_PASSWORD" variables to connect into redis.
 	// Here, the "projects.GetTestProject" method is called to make it testable and without global variables.
-	//os.Setenv(TestKbcProjectsLockHostKey, "redis:6379")
+	// os.Setenv(TestKbcProjectsLockHostKey, "redis:6379")
 	// os.Setenv(TestKbcProjectsLockPasswordKey, "testing")
-	//defer func() {
+	// defer func() {
 	//	os.Unsetenv(TestKbcProjectsLockHostKey)
 	//	os.Unsetenv(TestKbcProjectsLockPasswordKey)
-	//}()
+	// }()
 	projects, err := GetProjectsFrom(projectsForTest())
 	if err != nil {
 		fmt.Println("redis is not up.")

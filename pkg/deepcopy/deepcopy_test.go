@@ -7,10 +7,9 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
-
 	. "github.com/keboola/go-utils/pkg/deepcopy"
 	"github.com/keboola/go-utils/pkg/orderedmap"
+	"github.com/stretchr/testify/assert"
 )
 
 type Values []*Bar
