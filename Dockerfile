@@ -10,11 +10,14 @@ ENV PATH="$PATH:$GOPATH/bin"
 RUN apt-get update && apt-get install -y nano
 ENV EDITOR=nano
 
+# Install task
+RUN sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
 # Install tools
 RUN mkdir -p /tmp/build
-COPY Makefile /tmp/build/Makefile
+COPY Taskfile.yml /tmp/build/Taskfile.yml
 COPY scripts  /tmp/build/scripts
-RUN cd /tmp/build && make tools && rm -rf /tmp/build
+RUN cd /tmp/build && task tools && rm -rf /tmp/build
 
 # Set prompt
 RUN mkdir -p ~ && \
