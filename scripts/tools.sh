@@ -12,7 +12,6 @@ cd "$SCRIPT_DIR"
 # Version to install
 GOLANGCI_LINT_VERSION="v2.0.2"
 
-./install-gotestsum.sh -b $(go env GOPATH)/bin
 # golangci-lint
 if ! command -v golangci-lint &> /dev/null
 then
@@ -22,5 +21,3 @@ fi
 # Verify installation
 echo "Verifying golangci-lint installation..."
 golangci-lint --version
-
-go install golang.org/x/tools/cmd/godoc@latest

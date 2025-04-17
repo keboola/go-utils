@@ -7,20 +7,25 @@ jobs:
     steps:
       - name: Check out source code
         uses: actions/checkout@v4
-        
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
+      - name: Install Task
+        shell: bash
+        run: |
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
       - name: Install tools
         run: |
-          make tools
+          task tools
 
       - name: Lint and test
         env: 
           TEST_KBC_PROJECTS_LOCK_HOST: ${{ vars.TEST_KBC_PROJECTS_LOCK_HOST }}
           TEST_KBC_PROJECTS_LOCK_PASSWORD: ${{ secrets.TEST_KBC_PROJECTS_LOCK_PASSWORD }}
         run: |
-          make lint
-          make tests
+          task lint
+          task tests
