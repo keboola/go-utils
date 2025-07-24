@@ -3,6 +3,9 @@
 - **deepcopy**
   - Deep copy and deep translate of a value, extended version of [hvoecking gist](https://gist.github.com/hvoecking/10772475).
   - Usage `import "github.com/keboola/go-utils/pkg/deepcopy"`.
+- **diff**
+  - Diff tool to copare two JSONs with wilcards
+  - usage `import "github.com/keboola/go-utils/pkg/diff"`.
 - **orderedmap**
   - Extended version of [iancoleman/orderedmap](https://github.com/iancoleman/orderedmap).
   - Usage `import "github.com/keboola/go-utils/pkg/orderedmap"`.
