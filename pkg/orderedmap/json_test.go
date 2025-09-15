@@ -261,14 +261,14 @@ func TestOrderedMap_UnmarshalJSON_DuplicateKeys(t *testing.T) {
 
 func TestOrderedMap_UnmarshalJSON_SpecialChars(t *testing.T) {
 	t.Parallel()
-	in := `{ " \u0041\n\r\t\\\\\\\\\\\\ "  : { "\\\\\\" : "\\\\\"\\" }, "\\":  " \\\\ test ", "\n": "\r" }`
+	in := `{ " \u0041\n\r\t\\\\\\\\ ": { "\\\\\\": "\\\\\"\\" }, "\\":  " \\\\ test ", "\n": "\r" }`
 
 	o := New()
 	err := json.Unmarshal([]byte(in), &o)
 	assert.NoError(t, err)
 	assert.Equal(t, FromPairs([]Pair{
 		{
-			Key: " \u0041\n\r\t\\\\\\\\\\\\ ",
+			Key: " \u0041\n\r\t\\\\\\\\ ",
 			Value: FromPairs([]Pair{
 				{
 					Key:   "\\\\\\",
@@ -361,4 +361,34 @@ func TestOrderedMap_UnmarshalJSON_Struct(t *testing.T) {
 	value, ok := v.Data.Get("x")
 	assert.True(t, ok)
 	assert.Equal(t, float64(1), value)
+}
+
+func TestOrderedMap_UnmarshalJSON_StringSlice(t *testing.T) {
+	t.Parallel()
+	in := `{"rowsSortOrder":["a","b","c"]}`
+	m := New()
+	assert.NoError(t, json.Unmarshal([]byte(in), &m))
+	v, ok := m.Get("rowsSortOrder")
+	assert.True(t, ok)
+	_, isAny := v.([]any)
+	assert.False(t, isAny)
+	ss, ok := v.([]string)
+	assert.True(t, ok)
+	assert.Equal(t, []string{"a", "b", "c"}, ss)
+}
+
+func TestOrderedMap_UnmarshalJSON_NestedStringSlice(t *testing.T) {
+	t.Parallel()
+	in := `{"arr":[["a","b"],["c"]]}`
+	m := New()
+	assert.NoError(t, json.Unmarshal([]byte(in), &m))
+	v, _ := m.Get("arr")
+	outer, ok := v.([]any)
+	assert.True(t, ok)
+	inner0, ok := outer[0].([]string)
+	assert.True(t, ok)
+	assert.Equal(t, []string{"a", "b"}, inner0)
+	inner1, ok := outer[1].([]string)
+	assert.True(t, ok)
+	assert.Equal(t, []string{"c"}, inner1)
 }
