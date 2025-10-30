@@ -72,7 +72,14 @@ func (fl *fsProjectLocker) tryLock(ctx context.Context) (bool, context.CancelFun
 		return false, nil
 	}
 
-	cancel := func() { fl.unlock() }
+	// Use context-based cancellation to unify with redis locker behavior.
+	// When cancel() is called, or ctx is done, the project will be unlocked.
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	go func() {
+		<-ctxWithCancel.Done()
+		fl.unlock()
+	}()
+
 	// Locked
 	fl.locked = true
 	return true, cancel

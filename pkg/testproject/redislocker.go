@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bsm/redislock"
@@ -60,6 +61,7 @@ type redisProjectLocker struct {
 	projectID   string
 	redisLock   *redislock.Lock // lock between projects using redis
 	locked      bool
+	mu          sync.Mutex // guards refresh/unlock sequence
 }
 
 func (rl *redisLocker) newForProject(p *Project) projectLocker {
@@ -126,7 +128,6 @@ func (rl *redisProjectLocker) refreshLock(ctx context.Context) error {
 func (rl *redisProjectLocker) unlock() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	rl.cancel()
 	rl.locked = false
 	if err := rl.redisLock.Release(context.Background()); err != nil {
 		panic(fmt.Errorf(`cannot unlock test project using redis lock: %w`, err))

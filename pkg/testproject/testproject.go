@@ -191,7 +191,7 @@ func GetTestProject(opts ...Option) (*Project, context.CancelFunc, error) {
 	return mustGetProjects().GetTestProject(opts...)
 }
 
-func GetTestProjectInPath(path string, opts ...Option) (*Project, UnlockFn, error) {
+func GetTestProjectInPath(path string, opts ...Option) (*Project, context.CancelFunc, error) {
 	return mustGetProjectsInPath(path).GetTestProject(opts...)
 }
 
