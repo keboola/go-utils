@@ -104,15 +104,16 @@ func decodeJsonOrderedMap(dec *json.Decoder, o *OrderedMap) error {
 						return err
 					}
 					// convert []any of strings to []string
-					o.values[key] = convertStringSliceIfPossible(o.values[key])
+					// o.values[key] = convertStringSliceIfPossible(o.values[key])
 				} else if err = decodeJsonSlice(dec, []any{}); err != nil {
 					return err
-				} else {
-					// ensure conversion even if initial type hint was empty []any
-					if v, ok := o.values[key].([]any); ok {
-						o.values[key] = convertStringSliceIfPossible(v)
-					}
 				}
+				// else {
+				//	// ensure conversion even if initial type hint was empty []any
+				//	if v, ok := o.values[key].([]any); ok {
+				//		o.values[key] = convertStringSliceIfPossible(v)
+				//	}
+				//}
 			}
 		}
 	}
@@ -158,8 +159,8 @@ func decodeJsonSlice(dec *json.Decoder, s []any) error {
 						if err = decodeJsonSlice(dec, values); err != nil {
 							return err
 						}
-						// convert nested []any of strings to []string
-						s[index] = convertStringSliceIfPossible(values)
+						//// convert nested []any of strings to []string
+						// s[index] = convertStringSliceIfPossible(values)
 					} else if err = decodeJsonSlice(dec, []any{}); err != nil {
 						return err
 					}
@@ -173,33 +174,33 @@ func decodeJsonSlice(dec *json.Decoder, s []any) error {
 	}
 }
 
-// convertStringSliceIfPossible turns []any where all elements are strings into []string recursively.
-func convertStringSliceIfPossible(v any) any {
-	arr, ok := v.([]any)
-	if !ok {
-		return v
-	}
-	outStr := make([]string, len(arr))
-	for i, el := range arr {
-		switch t := el.(type) {
-		case string:
-			outStr[i] = t
-		default:
-			return convertNestedSlices(arr)
-		}
-	}
-	return outStr
-}
-
-func convertNestedSlices(arr []any) []any {
-	out := make([]any, len(arr))
-	for i, el := range arr {
-		// Recurse for nested []any
-		if sub, ok := el.([]any); ok {
-			out[i] = convertStringSliceIfPossible(sub)
-			continue
-		}
-		out[i] = el
-	}
-	return out
-}
+//// convertStringSliceIfPossible turns []any where all elements are strings into []string recursively.
+// func convertStringSliceIfPossible(v any) any {
+//	arr, ok := v.([]any)
+//	if !ok {
+//		return v
+//	}
+//	outStr := make([]string, len(arr))
+//	for i, el := range arr {
+//		switch t := el.(type) {
+//		case string:
+//			outStr[i] = t
+//		default:
+//			return convertNestedSlices(arr)
+//		}
+//	}
+//	return outStr
+//}
+//
+//func convertNestedSlices(arr []any) []any {
+//	out := make([]any, len(arr))
+//	for i, el := range arr {
+//		// Recurse for nested []any
+//		if sub, ok := el.([]any); ok {
+//			out[i] = convertStringSliceIfPossible(sub)
+//			continue
+//		}
+//		out[i] = el
+//	}
+//	return out
+//}
