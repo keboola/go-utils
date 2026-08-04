@@ -363,21 +363,29 @@ func TestOrderedMap_UnmarshalJSON_Struct(t *testing.T) {
 	assert.Equal(t, float64(1), value)
 }
 
-func TestOrderedMap_UnmarshalJSON_StringSlice(t *testing.T) {
+// An array of strings decodes to []any like any other JSON array - OrderedMap does not guess a
+// field's schema from its runtime content. Callers that know a field is a string array convert
+// explicitly via ToStringSlice (see TestToStringSlice). This guards against reintroducing the
+// value-dependent []any->[]string coercion removed in PSGO-37: that coercion broke every existing
+// `.([]any)` assertion for a string-only array anywhere in a decoded document (orchestrator
+// `dependsOn`, `shared_code_row_ids`, JSON-Schema `required`, etc. in keboola-as-code).
+func TestOrderedMap_UnmarshalJSON_ArrayOfStrings_StaysAny(t *testing.T) {
 	t.Parallel()
 	in := `{"rowsSortOrder":["a","b","c"]}`
 	m := New()
 	assert.NoError(t, json.Unmarshal([]byte(in), &m))
 	v, ok := m.Get("rowsSortOrder")
 	assert.True(t, ok)
-	_, isAny := v.([]any)
-	assert.False(t, isAny)
-	ss, ok := v.([]string)
-	assert.True(t, ok)
+	arr, ok := v.([]any)
+	assert.True(t, ok, "expected []any, got %T", v)
+	assert.Equal(t, []any{"a", "b", "c"}, arr)
+
+	ss, err := ToStringSlice(v)
+	assert.NoError(t, err)
 	assert.Equal(t, []string{"a", "b", "c"}, ss)
 }
 
-func TestOrderedMap_UnmarshalJSON_NestedStringSlice(t *testing.T) {
+func TestOrderedMap_UnmarshalJSON_NestedArrayOfStrings_StaysAny(t *testing.T) {
 	t.Parallel()
 	in := `{"arr":[["a","b"],["c"]]}`
 	m := New()
@@ -385,10 +393,52 @@ func TestOrderedMap_UnmarshalJSON_NestedStringSlice(t *testing.T) {
 	v, _ := m.Get("arr")
 	outer, ok := v.([]any)
 	assert.True(t, ok)
-	inner0, ok := outer[0].([]string)
+	inner0, ok := outer[0].([]any)
+	assert.True(t, ok, "expected []any, got %T", outer[0])
+	assert.Equal(t, []any{"a", "b"}, inner0)
+	inner1, ok := outer[1].([]any)
+	assert.True(t, ok, "expected []any, got %T", outer[1])
+	assert.Equal(t, []any{"c"}, inner1)
+}
+
+// Regression test: an empty array must stay []any{}, not be silently coerced to []string{}.
+// The removed coercion converted every empty array unconditionally, regardless of the field's
+// true schema (e.g. an empty "rows": [] array of objects would have become []string{}).
+func TestOrderedMap_UnmarshalJSON_EmptyArray_StaysAny(t *testing.T) {
+	t.Parallel()
+	in := `{"arr":[]}`
+	m := New()
+	assert.NoError(t, json.Unmarshal([]byte(in), &m))
+	v, ok := m.Get("arr")
 	assert.True(t, ok)
-	assert.Equal(t, []string{"a", "b"}, inner0)
-	inner1, ok := outer[1].([]string)
-	assert.True(t, ok)
-	assert.Equal(t, []string{"c"}, inner1)
+	arr, ok := v.([]any)
+	assert.True(t, ok, "expected []any, got %T", v)
+	assert.Empty(t, arr)
+}
+
+func TestToStringSlice(t *testing.T) {
+	t.Parallel()
+
+	ss, err := ToStringSlice(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{}, ss)
+
+	ss, err = ToStringSlice([]any{})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{}, ss)
+
+	ss, err = ToStringSlice([]any{"a", "b"})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a", "b"}, ss)
+
+	// Already-typed []string (e.g. set programmatically via Set) is accepted as-is.
+	ss, err = ToStringSlice([]string{"a", "b"})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a", "b"}, ss)
+
+	_, err = ToStringSlice("not a slice")
+	assert.ErrorContains(t, err, `expected []any or []string, found "string"`)
+
+	_, err = ToStringSlice([]any{"a", 1})
+	assert.ErrorContains(t, err, `expected string at index 1, found "int"`)
 }
