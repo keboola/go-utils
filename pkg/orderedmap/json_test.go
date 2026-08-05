@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOrderedMap_MarshalJSON(t *testing.T) {
@@ -373,31 +374,27 @@ func TestOrderedMap_UnmarshalJSON_ArrayOfStrings_StaysAny(t *testing.T) {
 	t.Parallel()
 	in := `{"rowsSortOrder":["a","b","c"]}`
 	m := New()
-	assert.NoError(t, json.Unmarshal([]byte(in), &m))
+	require.NoError(t, json.Unmarshal([]byte(in), &m))
 	v, ok := m.Get("rowsSortOrder")
-	assert.True(t, ok)
+	require.True(t, ok)
 	arr, ok := v.([]any)
-	assert.True(t, ok, "expected []any, got %T", v)
+	require.True(t, ok, "expected []any, got %T", v)
 	assert.Equal(t, []any{"a", "b", "c"}, arr)
-
-	ss, err := ToStringSlice(v)
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"a", "b", "c"}, ss)
 }
 
 func TestOrderedMap_UnmarshalJSON_NestedArrayOfStrings_StaysAny(t *testing.T) {
 	t.Parallel()
 	in := `{"arr":[["a","b"],["c"]]}`
 	m := New()
-	assert.NoError(t, json.Unmarshal([]byte(in), &m))
+	require.NoError(t, json.Unmarshal([]byte(in), &m))
 	v, _ := m.Get("arr")
 	outer, ok := v.([]any)
-	assert.True(t, ok)
+	require.True(t, ok, "expected []any, got %T", v)
 	inner0, ok := outer[0].([]any)
-	assert.True(t, ok, "expected []any, got %T", outer[0])
+	require.True(t, ok, "expected []any, got %T", outer[0])
 	assert.Equal(t, []any{"a", "b"}, inner0)
 	inner1, ok := outer[1].([]any)
-	assert.True(t, ok, "expected []any, got %T", outer[1])
+	require.True(t, ok, "expected []any, got %T", outer[1])
 	assert.Equal(t, []any{"c"}, inner1)
 }
 
@@ -408,37 +405,90 @@ func TestOrderedMap_UnmarshalJSON_EmptyArray_StaysAny(t *testing.T) {
 	t.Parallel()
 	in := `{"arr":[]}`
 	m := New()
-	assert.NoError(t, json.Unmarshal([]byte(in), &m))
+	require.NoError(t, json.Unmarshal([]byte(in), &m))
 	v, ok := m.Get("arr")
-	assert.True(t, ok)
+	require.True(t, ok)
 	arr, ok := v.([]any)
-	assert.True(t, ok, "expected []any, got %T", v)
+	require.True(t, ok, "expected []any, got %T", v)
 	assert.Empty(t, arr)
+}
+
+// Regression test for the v1.4.1 breakage: it wasn't only external consumers that broke.
+// OrderedMap's own path-based accessors (SetNestedPath/GetNestedPath's SliceStep handling,
+// VisitAllRecursive) type-switch on []any internally - once a decoded string array became
+// []string, GetNested/SetNested on an index into it returned "expected array found []string",
+// and VisitAllRecursive never descended into it at all. This documents why the type matters at
+// the package's own API surface, independent of any downstream consumer.
+func TestOrderedMap_DecodedStringArray_PathAccessors(t *testing.T) {
+	t.Parallel()
+	in := `{"dependsOn":["a","b"]}`
+	m := New()
+	require.NoError(t, json.Unmarshal([]byte(in), &m))
+
+	value, found, err := m.GetNested("dependsOn[0]")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "a", value)
+
+	require.NoError(t, m.SetNested("dependsOn[1]", "z"))
+	value, found, err = m.GetNested("dependsOn[1]")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "z", value)
+
+	var visited []string
+	m.VisitAllRecursive(func(path Path, _ any, _ any) {
+		visited = append(visited, path.String())
+	})
+	assert.Contains(t, visited, "dependsOn[0]")
+	assert.Contains(t, visited, "dependsOn[1]")
 }
 
 func TestToStringSlice(t *testing.T) {
 	t.Parallel()
+	cases := []struct {
+		name   string
+		input  any
+		output []string
+		err    string
+	}{
+		{name: "empty []any", input: []any{}, output: []string{}},
+		{name: "[]any of strings", input: []any{"a", "b"}, output: []string{"a", "b"}},
+		{name: "already-typed []string", input: []string{"a", "b"}, output: []string{"a", "b"}},
+		{name: "nil is an error, not an empty result", input: nil, err: `expected []any or []string, found "<nil>"`},
+		{name: "wrong type", input: "not a slice", err: `expected []any or []string, found "string"`},
+		{name: "non-string element", input: []any{"a", 1}, err: `expected string at index 1, found "int"`},
+	}
 
-	ss, err := ToStringSlice(nil)
-	assert.NoError(t, err)
-	assert.Equal(t, []string{}, ss)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			actual, err := ToStringSlice(c.input)
+			if c.err == "" {
+				require.NoError(t, err)
+				assert.Equal(t, c.output, actual)
+			} else {
+				require.Error(t, err)
+				assert.EqualError(t, err, c.err)
+			}
+		})
+	}
+}
 
-	ss, err = ToStringSlice([]any{})
-	assert.NoError(t, err)
-	assert.Equal(t, []string{}, ss)
+// Regression test for the aliasing bug: the []string branch must not return the caller's backing
+// array, or mutating the result would silently mutate the value stored inside the OrderedMap.
+func TestToStringSlice_DoesNotAliasStringInput(t *testing.T) {
+	t.Parallel()
+	m := New()
+	original := []string{"a", "b"}
+	m.Set("key", original)
 
-	ss, err = ToStringSlice([]any{"a", "b"})
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"a", "b"}, ss)
+	value, _ := m.Get("key")
+	result, err := ToStringSlice(value)
+	require.NoError(t, err)
+	result[0] = "mutated"
 
-	// Already-typed []string (e.g. set programmatically via Set) is accepted as-is.
-	ss, err = ToStringSlice([]string{"a", "b"})
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"a", "b"}, ss)
-
-	_, err = ToStringSlice("not a slice")
-	assert.ErrorContains(t, err, `expected []any or []string, found "string"`)
-
-	_, err = ToStringSlice([]any{"a", 1})
-	assert.ErrorContains(t, err, `expected string at index 1, found "int"`)
+	stillOriginal, _ := m.Get("key")
+	assert.Equal(t, []string{"a", "b"}, stillOriginal)
+	assert.Equal(t, []string{"a", "b"}, original)
 }

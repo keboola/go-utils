@@ -389,33 +389,6 @@ func visit(key Path, valueRaw any, parent any, callback VisitCallback) {
 	}
 }
 
-// ToStringSlice converts a value obtained from OrderedMap (e.g. via Get or GetNested) into a
-// []string. OrderedMap itself never guesses a field's schema from its runtime content - JSON/YAML
-// arrays always decode to []any - so callers that know a specific field is a string array must
-// opt in explicitly via this helper. Accepts either []any (the JSON/YAML-decoded shape) or
-// []string directly (e.g. a value set programmatically via Set). A nil value converts to an
-// empty, non-nil []string.
-func ToStringSlice(value any) ([]string, error) {
-	switch v := value.(type) {
-	case nil:
-		return []string{}, nil
-	case []string:
-		return v, nil
-	case []any:
-		out := make([]string, len(v))
-		for i, item := range v {
-			s, ok := item.(string)
-			if !ok {
-				return nil, fmt.Errorf(`expected string at index %d, found "%T"`, i, item)
-			}
-			out[i] = s
-		}
-		return out, nil
-	default:
-		return nil, fmt.Errorf(`expected []any or []string, found "%T"`, value)
-	}
-}
-
 func convertToMap(value any) any {
 	switch v := value.(type) {
 	case *OrderedMap:
