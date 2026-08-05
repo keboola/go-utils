@@ -128,7 +128,7 @@ func decodeJsonSlice(dec *json.Decoder, s []any) error {
 			switch delim {
 			case '{':
 				if index < len(s) {
-					if values, ok := s[index].(map[string]any); ok {
+					if values, ok := s[index].(map[string]any); ok { // nolint:gosec // G602: index is bounds-checked by "index < len(s)" above
 						newMap := &OrderedMap{
 							keys:   make([]string, 0, len(values)),
 							values: values,
@@ -136,8 +136,8 @@ func decodeJsonSlice(dec *json.Decoder, s []any) error {
 						if err = decodeJsonOrderedMap(dec, newMap); err != nil {
 							return err
 						}
-						s[index] = newMap
-					} else if oldMap, ok := s[index].(*OrderedMap); ok {
+						s[index] = newMap // nolint:gosec // G602: index is bounds-checked by "index < len(s)" above
+					} else if oldMap, ok := s[index].(*OrderedMap); ok { // nolint:gosec // G602: index is bounds-checked by "index < len(s)" above
 						newMap := &OrderedMap{
 							keys:   make([]string, 0, len(oldMap.values)),
 							values: oldMap.values,
@@ -145,7 +145,7 @@ func decodeJsonSlice(dec *json.Decoder, s []any) error {
 						if err = decodeJsonOrderedMap(dec, newMap); err != nil {
 							return err
 						}
-						s[index] = newMap
+						s[index] = newMap // nolint:gosec // G602: index is bounds-checked by "index < len(s)" above
 					} else if err = decodeJsonOrderedMap(dec, &OrderedMap{}); err != nil {
 						return err
 					}
@@ -154,12 +154,12 @@ func decodeJsonSlice(dec *json.Decoder, s []any) error {
 				}
 			case '[':
 				if index < len(s) {
-					if values, ok := s[index].([]any); ok {
+					if values, ok := s[index].([]any); ok { // nolint:gosec // G602: index is bounds-checked by "index < len(s)" above
 						if err = decodeJsonSlice(dec, values); err != nil {
 							return err
 						}
 						// convert nested []any of strings to []string
-						s[index] = convertStringSliceIfPossible(values)
+						s[index] = convertStringSliceIfPossible(values) // nolint:gosec // G602: index is bounds-checked by "index < len(s)" above
 					} else if err = decodeJsonSlice(dec, []any{}); err != nil {
 						return err
 					}
